@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Exercise, WorkoutSession, WorkoutSet, WorkoutTemplate, SetType } from '../models/workout';
+import { CompletedWorkout, Exercise, WorkoutSession, WorkoutSet, WorkoutTemplate, SetType } from '../models/workout';
 
 export interface ActiveExercise {
   exerciseId: string;
@@ -8,14 +8,26 @@ export interface ActiveExercise {
   restSeconds: number;
 }
 
+// Epley estimated 1RM — normalises any weight/rep combo for fair PR comparison
+function calcVolume(weight: number | null, reps: number | null): number {
+  const w = weight ?? 0;
+  const r = reps ?? 0;
+  if (w === 0 || r === 0) return 0;
+  return r === 1 ? w : w * (1 + r / 30);
+}
+
 interface WorkoutState {
   activeSession: WorkoutSession | null;
   activeExercises: ActiveExercise[];
   activeSets: WorkoutSet[];
   templates: WorkoutTemplate[];
-  customExercises: Exercise[]; // user-created exercises that persist
+  customExercises: Exercise[];
+  completedWorkouts: CompletedWorkout[];
+  lastCompletedWorkout: CompletedWorkout | null;
   pinnedNotes: Record<string, string>;
   exerciseHistory: Record<string, { weight: number | null; reps: number | null; type: SetType }[]>;
+  // all-time best volume (weight×reps) per exercise, used for PR detection
+  allTimeBest: Record<string, number>;
   restTimerEnd: number | null;
   restTimerDuration: number;
   restTimerPaused: boolean;
@@ -24,9 +36,11 @@ interface WorkoutState {
 
   startSession: (session: WorkoutSession) => void;
   endSession: () => void;
+  clearLastCompletedWorkout: () => void;
   addExerciseToSession: (exerciseId: string, restSeconds?: number) => void;
   removeExerciseFromSession: (exerciseId: string) => void;
   replaceExerciseInSession: (oldExerciseId: string, newExerciseId: string) => void;
+  checkAndMarkPR: (setId: string) => void;
   updateExerciseNotes: (exerciseId: string, notes: string) => void;
   toggleExerciseNotePin: (exerciseId: string) => void;
   updateExerciseRest: (exerciseId: string, restSeconds: number) => void;
@@ -45,13 +59,16 @@ interface WorkoutState {
   clearRestTimer: () => void;
 }
 
-export const useWorkoutStore = create<WorkoutState>((set) => ({
+export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   activeSession: null,
   activeExercises: [],
   activeSets: [],
   templates: [],
   customExercises: [],
+  completedWorkouts: [],
+  lastCompletedWorkout: null,
   pinnedNotes: {},
+  allTimeBest: {},
   exerciseHistory: {
     // Pre-seeded history so the "previous" column shows real data on first launch
     'ex_bench_press': [
@@ -111,27 +128,63 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   restTimerSetId: null,
 
   startSession: (session) => set({ activeSession: session, activeExercises: [], activeSets: [] }),
-  endSession: () => set((state) => {
-    // Save completed sets into exercise history for future reference
+  endSession: () => {
+    const state = get();
+    if (!state.activeSession) return null;
+
+    const endTime = new Date().toISOString();
+    const durationSeconds = Math.floor(
+      (new Date(endTime).getTime() - new Date(state.activeSession.startTime).getTime()) / 1000
+    );
+
+    // PR flags are already set on each set by checkAndMarkPR during the workout.
+    // Re-running detection here would compare against the already-updated allTimeBest
+    // and incorrectly clear flags. Just use what checkAndMarkPR recorded.
+    const completedSets = state.activeSets.filter((s) => s.completedAt !== '');
     const newHistory = { ...state.exerciseHistory };
-    const exerciseIds = new Set(state.activeSets.map((s) => s.exerciseId));
+
+    // Update exercise history (last session's sets per exercise)
+    const exerciseIds = new Set(completedSets.map((s) => s.exerciseId));
     exerciseIds.forEach((exerciseId) => {
-      const sets = state.activeSets
-        .filter((s) => s.exerciseId === exerciseId && s.completedAt !== '')
+      const sets = completedSets
+        .filter((s) => s.exerciseId === exerciseId)
         .sort((a, b) => a.setNumber - b.setNumber)
         .map((s) => ({ weight: s.weight, reps: s.reps, type: s.type }));
-      if (sets.length > 0) {
-        newHistory[exerciseId] = sets;
-      }
+      if (sets.length > 0) newHistory[exerciseId] = sets;
     });
-    return {
+
+    // Build completed workout record
+    const exerciseOrder = state.activeExercises.map((e) => e.exerciseId);
+    const totalVolumeKg = completedSets.reduce((acc, s) => acc + calcVolume(s.weight, s.reps), 0);
+    const prCount = completedSets.filter((s) => s.isPersonalRecord).length;
+
+    const completed: CompletedWorkout = {
+      id: state.activeSession.id,
+      name: state.activeSession.name,
+      templateId: state.activeSession.templateId,
+      startTime: state.activeSession.startTime,
+      endTime,
+      durationSeconds,
+      totalVolumeKg,
+      prCount,
+      exercises: exerciseOrder.map((exerciseId) => ({
+        exerciseId,
+        sets: completedSets.filter((s) => s.exerciseId === exerciseId),
+      })),
+    };
+
+    set({
       activeSession: null,
       activeExercises: [],
       activeSets: [],
       restTimerEnd: null,
       exerciseHistory: newHistory,
-    };
-  }),
+      completedWorkouts: [completed, ...state.completedWorkouts],
+      lastCompletedWorkout: completed,
+    });
+  },
+
+  clearLastCompletedWorkout: () => set({ lastCompletedWorkout: null }),
 
   addExerciseToSession: (exerciseId, restSeconds = 120) =>
     set((state) => {
@@ -294,6 +347,20 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
         e.exerciseId === exerciseId ? { ...e, restSeconds } : e
       ),
     })),
+
+  checkAndMarkPR: (setId) => set((state) => {
+    const s = state.activeSets.find((s) => s.id === setId);
+    if (!s || s.type !== 'working') return {};
+    const vol = calcVolume(s.weight, s.reps);
+    const best = state.allTimeBest[s.exerciseId] ?? 0;
+    if (vol > 0 && vol > best) {
+      return {
+        activeSets: state.activeSets.map((x) => x.id === setId ? { ...x, isPersonalRecord: true } : x),
+        allTimeBest: { ...state.allTimeBest, [s.exerciseId]: vol },
+      };
+    }
+    return { activeSets: state.activeSets.map((x) => x.id === setId ? { ...x, isPersonalRecord: false } : x) };
+  }),
 
   addSet: (newSet) => set((state) => ({ activeSets: [...state.activeSets, newSet] })),
   insertSetAtBeginning: (newSet) => set((state) => {

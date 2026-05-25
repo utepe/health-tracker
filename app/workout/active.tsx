@@ -9,6 +9,7 @@ import { typography } from '../../src/theme/typography';
 import { useWorkoutStore, ActiveExercise } from '../../src/stores/workoutStore';
 import { useExercisePickerStore } from '../../src/stores/exercisePickerStore';
 import { Exercise, WorkoutSet, SetType } from '../../src/models/workout';
+import { WorkoutSummaryModal } from '../../src/components/workout/WorkoutSummaryModal';
 import exercisesData from '../../src/data/exercises.json';
 
 const builtInExercises = exercisesData as Exercise[];
@@ -29,6 +30,8 @@ export default function ActiveWorkoutScreen() {
     activeExercises,
     activeSets,
     customExercises,
+    lastCompletedWorkout,
+    clearLastCompletedWorkout,
     addSet,
     insertSetAtBeginning,
     updateSet,
@@ -40,6 +43,7 @@ export default function ActiveWorkoutScreen() {
     toggleExerciseNotePin,
     updateExerciseRest,
     exerciseHistory,
+    checkAndMarkPR,
     endSession,
     restTimerEnd,
     restTimerDuration,
@@ -105,11 +109,10 @@ export default function ActiveWorkoutScreen() {
   }, [restTimerEnd]);
 
   const handleFinishWorkout = () => {
-    const completedSets = activeSets.filter((s) => s.weight !== null || s.reps !== null);
+    const completedSets = activeSets.filter((s) => s.completedAt !== '');
     if (Platform.OS === 'web') {
       if (window.confirm(`Finish workout with ${completedSets.length} set${completedSets.length !== 1 ? 's' : ''}?`)) {
         endSession();
-        router.back();
       }
     } else {
       const { Alert } = require('react-native');
@@ -118,7 +121,7 @@ export default function ActiveWorkoutScreen() {
         `Complete workout with ${completedSets.length} set${completedSets.length !== 1 ? 's' : ''}?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Finish', onPress: () => { endSession(); router.back(); } },
+          { text: 'Finish', onPress: () => endSession() },
         ]
       );
     }
@@ -152,6 +155,12 @@ export default function ActiveWorkoutScreen() {
             <Text style={styles.goBackText}>Go Back</Text>
           </Pressable>
         </View>
+        <WorkoutSummaryModal
+          visible={lastCompletedWorkout !== null}
+          workout={lastCompletedWorkout}
+          allExercises={[...builtInExercises, ...customExercises]}
+          onClose={() => { clearLastCompletedWorkout(); router.back(); }}
+        />
       </SafeAreaView>
     );
   }
@@ -281,7 +290,10 @@ export default function ActiveWorkoutScreen() {
               useExercisePickerStore.getState().setReplaceTarget(activeExercise.exerciseId);
               router.push('/workout/exercises?mode=replace');
             }}
-            onStartRest={(setId: string) => startRestTimer(activeExercise.restSeconds, setId)}
+            onStartRest={(setId: string) => {
+              checkAndMarkPR(setId);
+              startRestTimer(activeExercise.restSeconds, setId);
+            }}
           />
         ))}
 
@@ -300,6 +312,12 @@ export default function ActiveWorkoutScreen() {
 
         <View style={{ height: 60 }} />
       </ScrollView>
+      <WorkoutSummaryModal
+        visible={lastCompletedWorkout !== null}
+        workout={lastCompletedWorkout}
+        allExercises={[...builtInExercises, ...customExercises]}
+        onClose={() => { clearLastCompletedWorkout(); router.back(); }}
+      />
     </SafeAreaView>
   );
 }
@@ -677,9 +695,13 @@ function SetRow({
       <View style={[styles.setRow, completed && styles.setRowCompleted]}>
         {/* Set number / type */}
         <Pressable onPress={() => setShowTypePicker(!showTypePicker)} style={styles.colSet}>
-          <Text style={[styles.setLabel, { color: typeColors[set.type] }]}>
-            {typeLabels[set.type]}
-          </Text>
+          {set.isPersonalRecord ? (
+            <Ionicons name="trophy" size={14} color={colors.warning} />
+          ) : (
+            <Text style={[styles.setLabel, { color: typeColors[set.type] }]}>
+              {typeLabels[set.type]}
+            </Text>
+          )}
         </Pressable>
 
       {/* Previous */}
