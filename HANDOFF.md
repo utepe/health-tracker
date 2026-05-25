@@ -16,9 +16,9 @@ See `PLAN.md` for full architecture details and phased implementation roadmap.
 ## Current State
 
 **Phase 1 (Health Dashboard) — Complete.**
-**Phase 3 (Workout Planner) — ~90% complete.**
+**Phase 3 (Workout Planner) — ~95% complete.**
 
-The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs are functional. The workout planner now has a complete exercise management system: create, edit, search-to-create, and replace exercises — all persisted in Zustand. Three seed templates and pre-seeded exercise history are loaded on first launch so the "previous performance" column shows real data immediately.
+The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs are functional. The workout planner now has a complete exercise management system: create, edit, search-to-create, and replace exercises. PR detection using Epley 1RM runs on every set completion. A full workout summary modal appears immediately after finishing, showing duration, volume, PRs, and per-exercise set breakdown.
 
 **No Apple Developer Account** — using web preview for UI development. Native iOS build deferred.
 
@@ -63,6 +63,8 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
   - **Exercise history carry-over:** pre-seeded for 10 common exercises (Bench Press, Squat, Deadlift, OHP, Pull Up, Row, Curl, Tricep Pushdown, Lateral Raise, Leg Press). First time shows `—`, returning exercise auto-creates same number of sets with weight/reps pre-filled
   - **Rest timer progress bar** (inline): counts DOWN, full controls (−10s, Pause/Resume, Reset, +10s, Skip). Falls back to top banner when completely off-screen
   - Web-compatible confirm dialogs (window.confirm on web, Alert on native)
+  - **PR detection:** `checkAndMarkPR(setId)` called on every set check-off. Uses Epley 1RM (`weight × (1 + reps/30)`) for fair cross-rep-range comparison. Marks `isPersonalRecord: true` on the set and updates `allTimeBest` if beaten. Trophy icon replaces set number in the table for PR sets
+- **Workout summary modal:** shown immediately after confirming Finish. Header: name, date/time, duration, total volume, PR count with trophy. Per-exercise: best estimated 1RM. Per-set: weight × reps, 1RM value, trophy + amber text for PRs. Closing navigates back to workout tab
 - Resume banner on Workout tab when session is active
 - Starting from template pre-populates exercises with configured rest times
 - **Exercise management (exercises screen):**
@@ -100,6 +102,9 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | Working set numbers wrong after adding warmups | Computed dynamically from position among working sets only |
 | Custom exercises showed "Unknown" in active workout | `getExercise` was a module-level function only searching static JSON. Fixed by pulling `customExercises` from the store, building `allExercises = [...builtInExercises, ...customExercises]` in the component, and passing it as a prop to `ExerciseBlock` |
 | VS Code "Cannot use JSX unless '--jsx' flag is provided" error | Created `.vscode/settings.json` with `"typescript.tsdk": "node_modules/typescript/lib"` to use workspace TypeScript instead of VS Code's built-in version |
+| Workout summary modal never appeared after Finish | **Root cause:** Zustand `set()` is synchronous — `activeSession` became `null` before React's `setSummaryWorkout()` could apply, hitting the `if (!activeSession)` early return. **Fix:** moved `lastCompletedWorkout` into Zustand so `endSession` sets `activeSession: null` and `lastCompletedWorkout: completed` atomically in one `set()`. Component reads from store — both values ready on the same render |
+| PR flag overwritten to `false` on finish | **Root cause:** `endSession` re-ran Epley detection against `allTimeBest` already updated by `checkAndMarkPR`. `96 > 96 = false` cleared the flag. **Fix:** `endSession` no longer re-runs detection — it trusts `isPersonalRecord` already set by `checkAndMarkPR`. Only `checkAndMarkPR` mutates `allTimeBest` |
+| PR detection only compared weight×reps volume | Replaced with Epley 1RM (`weight × (1 + reps/30)`) so strength improvements are detected fairly across rep ranges |
 
 ---
 
@@ -144,12 +149,13 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | `src/components/cards/MetricCard.tsx` | Reusable metric card (icon, value, progress, trend, source) |
 | `src/components/cards/RecoveryCard.tsx` | Full-width recovery score card |
 | `src/components/workout/TemplatePreviewModal.tsx` | Centered modal showing template overview + start/edit |
+| `src/components/workout/WorkoutSummaryModal.tsx` | Post-workout summary modal: duration, volume, PR count, per-exercise sets with Epley 1RM, trophy icons on PR sets |
 
 ### State Management (`src/stores/`)
 | File | Purpose |
 |------|---------|
 | `src/stores/healthStore.ts` | Today's health metrics + history arrays (auto-loads mock on web) |
-| `src/stores/workoutStore.ts` | Active session, exercises, sets, templates, `customExercises`, rest timer, pinned notes, exercise history (pre-seeded for 10 exercises). Actions: `addCustomExercise`, `updateCustomExercise`, `replaceExerciseInSession` |
+| `src/stores/workoutStore.ts` | Active session, exercises, sets, templates, `customExercises`, rest timer, pinned notes, exercise history (pre-seeded for 10 exercises), `allTimeBest` (Epley 1RM per exercise), `completedWorkouts`, `lastCompletedWorkout`. Actions: `checkAndMarkPR`, `endSession` (atomic — sets `lastCompletedWorkout` in same call as `activeSession: null`), `clearLastCompletedWorkout`, `addCustomExercise`, `updateCustomExercise`, `replaceExerciseInSession` |
 | `src/stores/exercisePickerStore.ts` | Temporary selection state + `replaceTargetId` for replace flow |
 | `src/stores/settingsStore.ts` | Connection states, goals, unit preferences |
 
@@ -228,19 +234,15 @@ Key behaviors:
 
 ### Immediate (Phase 3 completion)
 
-1. **PR detection** — When a set is completed, compare weight × reps to the exercise's all-time best. If new PR, set `isPersonalRecord: true` and show a trophy icon on the set row. Requires tracking an `allTimeBest` record per exercise alongside `exerciseHistory`.
+1. **Populate workout history screen** — `completedWorkouts` is already in the store. Wire `app/workout/history.tsx` to list them: date, duration, total volume, exercise count. Tap to expand (can reuse `WorkoutSummaryModal` or a similar read-only layout).
 
-2. **Persist completed workouts** — `endSession()` currently only saves per-exercise history (last sets), not the full workout record. Add a `completedWorkouts` array to the store. Save date, duration (endTime - startTime), total volume (sum of weight × reps), exercise count, and all sets.
+2. **Pre-populate sets from template** — When starting from a template, create `max(template.targetSets, historySetCount)` set rows per exercise. Currently only history count is used (defaults to 1 if no history).
 
-3. **Populate workout history screen** — Wire `completedWorkouts` into `app/workout/history.tsx` showing date, duration, total volume, exercise count per session. Tap to expand and see per-exercise sets.
+3. **Expand exercise library** — Go from 40 to 200+ exercises in `src/data/exercises.json`.
 
-4. **Pre-populate sets from template** — When starting from a template, auto-create `max(template.targetSets, historySetCount)` set rows per exercise. Currently sets come from history only (default 1 if no history).
+4. **Superset support** — Allow grouping exercises in the template editor and active workout (shared rest timer between superset exercises).
 
-5. **Expand exercise library** — Go from 40 to 200+ exercises in `exercises.json`.
-
-6. **Superset support** — Allow grouping exercises in the template editor and active workout (shared rest timer between superset exercises).
-
-7. **Zustand persistence** — Add `zustand/middleware` persist with AsyncStorage so `pinnedNotes`, `exerciseHistory`, `templates`, `customExercises`, and `completedWorkouts` survive app restarts.
+5. **Zustand persistence** — Add `zustand/middleware` persist with AsyncStorage so `pinnedNotes`, `exerciseHistory`, `allTimeBest`, `templates`, `customExercises`, and `completedWorkouts` survive app restarts. Currently everything resets on page refresh — this is the most impactful remaining item.
 
 ### Phase 2: Garmin API Integration
 
