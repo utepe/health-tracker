@@ -1,0 +1,362 @@
+[
+  {
+    "id": "ex_bench_press",
+    "name": "Bench Press",
+    "muscleGroup": "chest",
+    "secondaryMuscles": ["triceps", "shoulders"],
+    "equipment": "barbell",
+    "instructions": "Lie on a flat bench, grip bar slightly wider than shoulder width. Lower bar to mid-chest, then press up to full extension.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_incline_bench_press",
+    "name": "Incline Bench Press",
+    "muscleGroup": "chest",
+    "secondaryMuscles": ["shoulders", "triceps"],
+    "equipment": "barbell",
+    "instructions": "Set bench to 30-45 degrees. Lower bar to upper chest, press up to full extension.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_dumbbell_bench_press",
+    "name": "Dumbbell Bench Press",
+    "muscleGroup": "chest",
+    "secondaryMuscles": ["triceps", "shoulders"],
+    "equipment": "dumbbell",
+    "instructions": "Lie on flat bench with dumbbells at chest level. Press up, bringing dumbbells together at the top.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_chest_fly",
+    "name": "Dumbbell Chest Fly",
+    "muscleGroup": "chest",
+    "secondaryMuscles": ["shoulders"],
+    "equipment": "dumbbell",
+    "instructions": "Lie on flat bench, arms extended above chest with slight bend in elbows. Lower arms in arc until stretch is felt, return to start.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_cable_crossover",
+    "name": "Cable Crossover",
+    "muscleGroup": "chest",
+    "secondaryMuscles": ["shoulders"],
+    "equipment": "cable",
+    "instructions": "Stand between cable columns with handles at high position. Step forward, bring hands together in front of chest in a hugging motion.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_push_up",
+    "name": "Push Up",
+    "muscleGroup": "chest",
+    "secondaryMuscles": ["triceps", "shoulders", "core"],
+    "equipment": "bodyweight",
+    "instructions": "Start in plank position. Lower chest to ground, then push back up to full extension.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_dip",
+    "name": "Dips",
+    "muscleGroup": "chest",
+    "secondaryMuscles": ["triceps", "shoulders"],
+    "equipment": "bodyweight",
+    "instructions": "Grip parallel bars, lean slightly forward. Lower body until upper arms are parallel to ground, then press back up.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_deadlift",
+    "name": "Deadlift",
+    "muscleGroup": "back",
+    "secondaryMuscles": ["hamstrings", "glutes", "core"],
+    "equipment": "barbell",
+    "instructions": "Stand with feet hip-width, bar over mid-foot. Hinge at hips, grip bar. Drive through floor, extending hips and knees simultaneously.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_barbell_row",
+    "name": "Barbell Row",
+    "muscleGroup": "back",
+    "secondaryMuscles": ["biceps", "core"],
+    "equipment": "barbell",
+    "instructions": "Hinge forward at hips to ~45 degrees, grip bar shoulder-width. Pull bar to lower chest, squeeze shoulder blades.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_pull_up",
+    "name": "Pull Up",
+    "muscleGroup": "back",
+    "secondaryMuscles": ["biceps", "forearms"],
+    "equipment": "bodyweight",
+    "instructions": "Hang from bar with overhand grip. Pull chest toward bar, lower with control.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_lat_pulldown",
+    "name": "Lat Pulldown",
+    "muscleGroup": "back",
+    "secondaryMuscles": ["biceps"],
+    "equipment": "cable",
+    "instructions": "Grip bar wider than shoulders. Pull bar down to upper chest, squeezing lats. Return with control.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_seated_cable_row",
+    "name": "Seated Cable Row",
+    "muscleGroup": "back",
+    "secondaryMuscles": ["biceps", "core"],
+    "equipment": "cable",
+    "instructions": "Sit upright, feet on platform. Pull handle to abdomen, squeezing shoulder blades together.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_dumbbell_row",
+    "name": "Dumbbell Row",
+    "muscleGroup": "back",
+    "secondaryMuscles": ["biceps"],
+    "equipment": "dumbbell",
+    "instructions": "Place one hand and knee on bench. Pull dumbbell to hip, keeping elbow close to body.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_face_pull",
+    "name": "Face Pull",
+    "muscleGroup": "back",
+    "secondaryMuscles": ["shoulders"],
+    "equipment": "cable",
+    "instructions": "Set cable at face height with rope attachment. Pull toward face, externally rotating shoulders at end position.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_overhead_press",
+    "name": "Overhead Press",
+    "muscleGroup": "shoulders",
+    "secondaryMuscles": ["triceps", "core"],
+    "equipment": "barbell",
+    "instructions": "Stand with bar at shoulder height. Press bar overhead to full lockout, keeping core braced.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_lateral_raise",
+    "name": "Lateral Raise",
+    "muscleGroup": "shoulders",
+    "secondaryMuscles": [],
+    "equipment": "dumbbell",
+    "instructions": "Stand with dumbbells at sides. Raise arms out to sides until parallel with ground, slight bend in elbows.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_front_raise",
+    "name": "Front Raise",
+    "muscleGroup": "shoulders",
+    "secondaryMuscles": [],
+    "equipment": "dumbbell",
+    "instructions": "Stand with dumbbells in front of thighs. Raise one or both arms forward to shoulder height.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_rear_delt_fly",
+    "name": "Rear Delt Fly",
+    "muscleGroup": "shoulders",
+    "secondaryMuscles": ["back"],
+    "equipment": "dumbbell",
+    "instructions": "Bend forward at hips. Raise dumbbells out to sides, squeezing rear delts at the top.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_arnold_press",
+    "name": "Arnold Press",
+    "muscleGroup": "shoulders",
+    "secondaryMuscles": ["triceps"],
+    "equipment": "dumbbell",
+    "instructions": "Start with dumbbells at shoulder height, palms facing you. Press up while rotating palms outward to face forward at top.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_barbell_curl",
+    "name": "Barbell Curl",
+    "muscleGroup": "biceps",
+    "secondaryMuscles": ["forearms"],
+    "equipment": "barbell",
+    "instructions": "Stand with bar at arm's length, underhand grip. Curl bar up to shoulder level, keeping elbows stationary.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_dumbbell_curl",
+    "name": "Dumbbell Curl",
+    "muscleGroup": "biceps",
+    "secondaryMuscles": ["forearms"],
+    "equipment": "dumbbell",
+    "instructions": "Stand with dumbbells at sides. Curl up, supinating wrist as you lift. Lower with control.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_hammer_curl",
+    "name": "Hammer Curl",
+    "muscleGroup": "biceps",
+    "secondaryMuscles": ["forearms"],
+    "equipment": "dumbbell",
+    "instructions": "Stand with dumbbells at sides, palms facing in (neutral grip). Curl up keeping neutral wrist position.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_tricep_pushdown",
+    "name": "Tricep Pushdown",
+    "muscleGroup": "triceps",
+    "secondaryMuscles": [],
+    "equipment": "cable",
+    "instructions": "Stand at cable machine with bar/rope attachment at high position. Push down until arms are fully extended.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_skull_crusher",
+    "name": "Skull Crusher",
+    "muscleGroup": "triceps",
+    "secondaryMuscles": [],
+    "equipment": "barbell",
+    "instructions": "Lie on bench, hold bar above chest with arms extended. Lower bar toward forehead by bending elbows, then extend.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_overhead_tricep_extension",
+    "name": "Overhead Tricep Extension",
+    "muscleGroup": "triceps",
+    "secondaryMuscles": [],
+    "equipment": "dumbbell",
+    "instructions": "Hold dumbbell overhead with both hands. Lower behind head by bending elbows, then extend back up.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_squat",
+    "name": "Barbell Squat",
+    "muscleGroup": "quads",
+    "secondaryMuscles": ["glutes", "hamstrings", "core"],
+    "equipment": "barbell",
+    "instructions": "Bar on upper back, feet shoulder-width. Squat down until thighs are parallel or below, drive back up.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_front_squat",
+    "name": "Front Squat",
+    "muscleGroup": "quads",
+    "secondaryMuscles": ["glutes", "core"],
+    "equipment": "barbell",
+    "instructions": "Bar rests on front delts, elbows high. Squat down keeping torso upright, drive back up.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_leg_press",
+    "name": "Leg Press",
+    "muscleGroup": "quads",
+    "secondaryMuscles": ["glutes", "hamstrings"],
+    "equipment": "machine",
+    "instructions": "Sit in leg press, feet shoulder-width on platform. Lower platform until knees are at 90 degrees, press back up.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_leg_extension",
+    "name": "Leg Extension",
+    "muscleGroup": "quads",
+    "secondaryMuscles": [],
+    "equipment": "machine",
+    "instructions": "Sit in machine with pad on lower shins. Extend legs to full lockout, squeeze quads at top.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_bulgarian_split_squat",
+    "name": "Bulgarian Split Squat",
+    "muscleGroup": "quads",
+    "secondaryMuscles": ["glutes", "hamstrings"],
+    "equipment": "dumbbell",
+    "instructions": "Rear foot elevated on bench. Lower until front thigh is parallel, drive back up through front heel.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_romanian_deadlift",
+    "name": "Romanian Deadlift",
+    "muscleGroup": "hamstrings",
+    "secondaryMuscles": ["glutes", "back"],
+    "equipment": "barbell",
+    "instructions": "Hold bar at hip height. Push hips back, lowering bar along legs with slight knee bend. Feel stretch in hamstrings, return to start.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_leg_curl",
+    "name": "Leg Curl",
+    "muscleGroup": "hamstrings",
+    "secondaryMuscles": [],
+    "equipment": "machine",
+    "instructions": "Lie face down on machine, pad behind ankles. Curl heels toward glutes, lower with control.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_hip_thrust",
+    "name": "Hip Thrust",
+    "muscleGroup": "glutes",
+    "secondaryMuscles": ["hamstrings"],
+    "equipment": "barbell",
+    "instructions": "Upper back on bench, bar across hips. Drive hips up to full extension, squeezing glutes at top.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_lunge",
+    "name": "Walking Lunge",
+    "muscleGroup": "quads",
+    "secondaryMuscles": ["glutes", "hamstrings"],
+    "equipment": "dumbbell",
+    "instructions": "Hold dumbbells at sides. Step forward into lunge, lower until rear knee nearly touches ground. Step through to next rep.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_calf_raise",
+    "name": "Calf Raise",
+    "muscleGroup": "calves",
+    "secondaryMuscles": [],
+    "equipment": "machine",
+    "instructions": "Stand on edge of platform with heels hanging off. Rise up onto toes, pause at top, lower slowly below platform level.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_plank",
+    "name": "Plank",
+    "muscleGroup": "core",
+    "secondaryMuscles": ["shoulders"],
+    "equipment": "bodyweight",
+    "instructions": "Hold body in straight line from head to heels, supported on forearms and toes. Brace core throughout.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_hanging_leg_raise",
+    "name": "Hanging Leg Raise",
+    "muscleGroup": "core",
+    "secondaryMuscles": ["forearms"],
+    "equipment": "bodyweight",
+    "instructions": "Hang from bar. Raise legs until parallel with ground (or higher), lower with control.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_cable_crunch",
+    "name": "Cable Crunch",
+    "muscleGroup": "core",
+    "secondaryMuscles": [],
+    "equipment": "cable",
+    "instructions": "Kneel facing cable machine with rope behind head. Crunch down, bringing elbows toward knees.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_russian_twist",
+    "name": "Russian Twist",
+    "muscleGroup": "core",
+    "secondaryMuscles": [],
+    "equipment": "bodyweight",
+    "instructions": "Sit with knees bent, lean back slightly. Rotate torso side to side, optionally holding a weight.",
+    "isCustom": false
+  },
+  {
+    "id": "ex_ab_wheel",
+    "name": "Ab Wheel Rollout",
+    "muscleGroup": "core",
+    "secondaryMuscles": ["shoulders"],
+    "equipment": "other",
+    "instructions": "Kneel with ab wheel on floor. Roll forward extending body, then pull back using core. Keep hips from sagging.",
+    "isCustom": false
+  }
+]
