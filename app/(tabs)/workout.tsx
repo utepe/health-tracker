@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,10 +11,58 @@ import { typography } from '../../src/theme/typography';
 import { Ionicons } from '@expo/vector-icons';
 import { WorkoutTemplate, WorkoutSession } from '../../src/models/workout';
 
+const SEED_TEMPLATES: WorkoutTemplate[] = [
+  {
+    id: 'tpl_push_a',
+    name: 'Push Day A',
+    lastPerformed: '2026-05-21',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    exercises: [
+      { exerciseId: 'ex_bench_press',              order: 0, targetSets: 3, supersetGroup: null, restSeconds: 180, notes: null },
+      { exerciseId: 'ex_overhead_press',           order: 1, targetSets: 3, supersetGroup: null, restSeconds: 150, notes: null },
+      { exerciseId: 'ex_incline_bench_press',      order: 2, targetSets: 3, supersetGroup: null, restSeconds: 120, notes: null },
+      { exerciseId: 'ex_lateral_raise',            order: 3, targetSets: 3, supersetGroup: null, restSeconds: 90,  notes: null },
+      { exerciseId: 'ex_tricep_pushdown',          order: 4, targetSets: 3, supersetGroup: null, restSeconds: 90,  notes: null },
+    ],
+  },
+  {
+    id: 'tpl_pull_a',
+    name: 'Pull Day A',
+    lastPerformed: '2026-05-22',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    exercises: [
+      { exerciseId: 'ex_deadlift',                 order: 0, targetSets: 3, supersetGroup: null, restSeconds: 240, notes: null },
+      { exerciseId: 'ex_barbell_row',              order: 1, targetSets: 3, supersetGroup: null, restSeconds: 150, notes: null },
+      { exerciseId: 'ex_pull_up',                  order: 2, targetSets: 3, supersetGroup: null, restSeconds: 120, notes: null },
+      { exerciseId: 'ex_seated_cable_row',         order: 3, targetSets: 3, supersetGroup: null, restSeconds: 90,  notes: null },
+      { exerciseId: 'ex_dumbbell_curl',            order: 4, targetSets: 3, supersetGroup: null, restSeconds: 90,  notes: null },
+    ],
+  },
+  {
+    id: 'tpl_legs_a',
+    name: 'Legs Day A',
+    lastPerformed: '2026-05-20',
+    createdAt: '2026-05-01T00:00:00.000Z',
+    exercises: [
+      { exerciseId: 'ex_squat',                    order: 0, targetSets: 4, supersetGroup: null, restSeconds: 240, notes: null },
+      { exerciseId: 'ex_romanian_deadlift',        order: 1, targetSets: 3, supersetGroup: null, restSeconds: 150, notes: null },
+      { exerciseId: 'ex_leg_press',                order: 2, targetSets: 3, supersetGroup: null, restSeconds: 120, notes: null },
+      { exerciseId: 'ex_leg_extension',            order: 3, targetSets: 3, supersetGroup: null, restSeconds: 90,  notes: null },
+      { exerciseId: 'ex_calf_raise',               order: 4, targetSets: 4, supersetGroup: null, restSeconds: 60,  notes: null },
+    ],
+  },
+];
+
 export default function WorkoutScreen() {
   const router = useRouter();
-  const { templates, activeSession, startSession, addExerciseToSession } = useWorkoutStore();
+  const { templates, activeSession, startSession, addExerciseToSession, setTemplates } = useWorkoutStore();
   const [previewTemplate, setPreviewTemplate] = useState<WorkoutTemplate | null>(null);
+
+  useEffect(() => {
+    if (templates.length === 0) {
+      setTemplates(SEED_TEMPLATES);
+    }
+  }, []);
 
   const handleStartEmpty = () => {
     const session: WorkoutSession = {

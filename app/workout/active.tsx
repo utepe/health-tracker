@@ -11,11 +11,7 @@ import { useExercisePickerStore } from '../../src/stores/exercisePickerStore';
 import { Exercise, WorkoutSet, SetType } from '../../src/models/workout';
 import exercisesData from '../../src/data/exercises.json';
 
-const allExercises = exercisesData as Exercise[];
-
-function getExercise(id: string): Exercise | undefined {
-  return allExercises.find((e) => e.id === id);
-}
+const builtInExercises = exercisesData as Exercise[];
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -32,12 +28,14 @@ export default function ActiveWorkoutScreen() {
     activeSession,
     activeExercises,
     activeSets,
+    customExercises,
     addSet,
     insertSetAtBeginning,
     updateSet,
     removeSet,
     addExerciseToSession,
     removeExerciseFromSession,
+    replaceExerciseInSession,
     updateExerciseNotes,
     toggleExerciseNotePin,
     updateExerciseRest,
@@ -56,7 +54,7 @@ export default function ActiveWorkoutScreen() {
     clearRestTimer,
   } = useWorkoutStore();
 
-  const { selectedIds, clear: clearPicker } = useExercisePickerStore();
+  const { selectedIds, clear: clearPicker, replaceTargetId, clearReplaceTarget } = useExercisePickerStore();
   const [elapsed, setElapsed] = useState(0);
   const [restRemaining, setRestRemaining] = useState(0);
   const [inlineTimerVisible, setInlineTimerVisible] = useState(true);
@@ -68,7 +66,12 @@ export default function ActiveWorkoutScreen() {
   // Pick up exercises from picker when returning
   useEffect(() => {
     if (selectedIds.length > 0) {
-      selectedIds.forEach((id) => addExerciseToSession(id));
+      if (replaceTargetId) {
+        replaceExerciseInSession(replaceTargetId, selectedIds[0]);
+        clearReplaceTarget();
+      } else {
+        selectedIds.forEach((id) => addExerciseToSession(id));
+      }
       clearPicker();
     }
   }, [selectedIds]);
@@ -250,6 +253,7 @@ export default function ActiveWorkoutScreen() {
           <ExerciseBlock
             key={activeExercise.exerciseId}
             activeExercise={activeExercise}
+            allExercises={[...builtInExercises, ...customExercises]}
             sets={activeSets.filter((s) => s.exerciseId === activeExercise.exerciseId)}
             history={exerciseHistory[activeExercise.exerciseId] ?? null}
             sessionId={activeSession.id}
@@ -273,6 +277,10 @@ export default function ActiveWorkoutScreen() {
             onTogglePin={() => toggleExerciseNotePin(activeExercise.exerciseId)}
             onUpdateRest={(seconds) => updateExerciseRest(activeExercise.exerciseId, seconds)}
             onRemoveExercise={() => removeExerciseFromSession(activeExercise.exerciseId)}
+            onReplaceExercise={() => {
+              useExercisePickerStore.getState().setReplaceTarget(activeExercise.exerciseId);
+              router.push('/workout/exercises?mode=replace');
+            }}
             onStartRest={(setId: string) => startRestTimer(activeExercise.restSeconds, setId)}
           />
         ))}
@@ -305,6 +313,7 @@ function formatRestTime(seconds: number): string {
 // --- Exercise Block (Strong-style) ---
 function ExerciseBlock({
   activeExercise,
+  allExercises,
   sets,
   history,
   sessionId,
@@ -328,9 +337,11 @@ function ExerciseBlock({
   onTogglePin,
   onUpdateRest,
   onRemoveExercise,
+  onReplaceExercise,
   onStartRest,
 }: {
   activeExercise: ActiveExercise;
+  allExercises: Exercise[];
   sets: WorkoutSet[];
   history: { weight: number | null; reps: number | null; type: SetType }[] | null;
   sessionId: string;
@@ -354,12 +365,13 @@ function ExerciseBlock({
   onTogglePin: () => void;
   onUpdateRest: (seconds: number) => void;
   onRemoveExercise: () => void;
+  onReplaceExercise: () => void;
   onStartRest: (setId: string) => void;
 }) {
   const [showNotes, setShowNotes] = useState(activeExercise.notes.length > 0 || activeExercise.notesPinned);
   const [showMenu, setShowMenu] = useState(false);
   const [showRestEdit, setShowRestEdit] = useState(false);
-  const exercise = getExercise(activeExercise.exerciseId);
+  const exercise = allExercises.find((e) => e.id === activeExercise.exerciseId);
 
   const handleAddSet = () => {
     const setNumber = sets.length + 1;
@@ -444,6 +456,13 @@ function ExerciseBlock({
           >
             <Ionicons name="arrow-up-outline" size={16} color={colors.textSecondary} />
             <Text style={styles.menuText}>Add Warm-up Set</Text>
+          </Pressable>
+          <Pressable
+            style={styles.menuItem}
+            onPress={() => { onReplaceExercise(); setShowMenu(false); }}
+          >
+            <Ionicons name="swap-horizontal-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.menuText}>Replace Exercise</Text>
           </Pressable>
           <Pressable
             style={styles.menuItem}

@@ -15,9 +15,10 @@ See `PLAN.md` for full architecture details and phased implementation roadmap.
 
 ## Current State
 
-**Phase 1 is complete. Phase 3 (Workout Planner) is ~85% complete.**
+**Phase 1 (Health Dashboard) — Complete.**
+**Phase 3 (Workout Planner) — ~90% complete.**
 
-The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs are functional with source badges, 7-day histories, and a 5-factor sleep scoring system. The workout planner has: exercise picker with search/filter, template CRUD with per-exercise rest time config, active workout screen (Strong-style with set logging, inline rest timer progress bar with pause/resume/+10s/-10s/reset/skip controls, pinned/session notes, exercise notes, set type picker, exercise history carry-over), template preview modal, and workout history shell.
+The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs are functional. The workout planner now has a complete exercise management system: create, edit, search-to-create, and replace exercises — all persisted in Zustand. Three seed templates and pre-seeded exercise history are loaded on first launch so the "previous performance" column shows real data immediately.
 
 **No Apple Developer Account** — using web preview for UI development. Native iOS build deferred.
 
@@ -39,48 +40,42 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 - Progress bars stay within card bounds
 - All dependencies install successfully
 
-### Workout Planner (Phase 3 - In Progress)
+### Workout Planner (Phase 3 - ~90% complete)
 - Exercise picker with search and muscle group filter chips (ScrollView-based, not FlatList)
 - Template creation/editing (name, exercises, target sets, rest time per exercise via +/-15s stepper, reorder, delete)
+- **3 seed templates auto-loaded on first launch:** Push Day A, Pull Day A, Legs Day A (each with 5 exercises, correct rest times)
 - Template preview modal (centered card, not full-screen) with exercise overview, start workout, edit
 - Active workout screen (Strong-style):
   - Minimize button (chevron-down) to navigate away while workout continues
   - Timer persists based on startTime (recalculates on re-entry)
   - Workout title + 3-dot menu + notes placeholder
   - Per-exercise blocks: name, muscle/equipment label, progression icon, 3-dot menu
-  - 3-dot menu: Add Note, Update Rest Timer (inline editor), Add Warm-up Set, Remove Exercise
-  - **Notes with pin toggle:**
-    - Unpinned (outline icon, subtle card) = session-only note, visible in workout history
-    - Pinned (filled yellow icon, yellow banner) = persists across all future workouts for that exercise
-    - Pin state toggleable via tap on pin icon
+  - 3-dot menu: Add Note, Update Rest Timer, Add Warm-up Set, **Replace Exercise**, Remove Exercise
+  - **Replace Exercise flow:** tap → navigates to exercise picker in `mode=replace` (single-tap select, no checkboxes) → swaps exercise in-place, loads new exercise's history, preserves rest time config
+  - Notes with pin toggle (pinned = yellow banner, persists across sessions; unpinned = session-only)
   - Set table: SET | PREVIOUS | KG | REPS | checkmark
-  - **Set type picker** (popup selector instead of cycling): Working/Warmup/Dropset/Failure with color coding
-  - **Working set numbering**: always sequential (1, 2, 3...) based on working sets only, unaffected by warmup/drop/failure sets
-  - **Warm-up set insertion**: inserts after last warmup but before working sets (not at end)
+  - Set type picker (popup selector): Working/Warmup/Dropset/Failure with color coding
+  - Working set numbering: always sequential (1, 2, 3...) based on working sets only
+  - Warm-up set insertion: inserts after last warmup but before working sets
   - Rest time label between set rows showing configured duration
   - Per-set rest override via `restSeconds` field (null = use exercise default)
   - "Add Set" per exercise, "Add Exercises" button, "Cancel Workout" button
-  - **Exercise history carry-over:**
-    - First time: defaults to 1 empty set
-    - Returning exercise: auto-creates same number of sets as last session with weight/reps pre-filled
-    - PREVIOUS column shows last session's data per set (e.g. "60 x 5")
-  - **Rest timer progress bar** (inline, appears after completing a set):
-    - Progress bar counting DOWN (remaining/total ratio, fixed denominator)
-    - Left side: -10s button, Pause/Resume button
-    - Center: countdown timer text (horizontally aligned with static rest label)
-    - Right side: Reset button, +10s button, Skip button
-    - Buttons spaced with `gap: spacing.md` and `minWidth: 36` for usability
-    - Falls back to top-of-screen banner ONLY when inline timer is completely off-screen
+  - **Exercise history carry-over:** pre-seeded for 10 common exercises (Bench Press, Squat, Deadlift, OHP, Pull Up, Row, Curl, Tricep Pushdown, Lateral Raise, Leg Press). First time shows `—`, returning exercise auto-creates same number of sets with weight/reps pre-filled
+  - **Rest timer progress bar** (inline): counts DOWN, full controls (−10s, Pause/Resume, Reset, +10s, Skip). Falls back to top banner when completely off-screen
   - Web-compatible confirm dialogs (window.confirm on web, Alert on native)
 - Resume banner on Workout tab when session is active
 - Starting from template pre-populates exercises with configured rest times
-- Exercise picker store for passing selections between screens
+- **Exercise management (exercises screen):**
+  - **Create exercise:** "+" button in header opens bottom-sheet modal (name, muscle group chips, equipment chips, optional instructions). Saved to `customExercises` in Zustand, immediately visible in list with purple "Custom" badge
+  - **Search-to-create:** when search returns no results, a "Create '[search term]'" prompt appears with the name pre-filled in the modal
+  - **Edit custom exercise:** pencil icon on each custom exercise row opens the same modal pre-filled. Saves via `updateCustomExercise`. Built-in exercises have no edit button
+  - Edit and select icons have `gap: spacing.lg` + `padding + hitSlop: 12` to prevent mis-taps
+  - Custom exercises appear in the lookup inside the active workout (fix: `allExercises` built from `[...builtInExercises, ...customExercises]` inside the component and passed as a prop — static module-level lookup was causing "Unknown" display)
 - 40 pre-built exercises across all muscle groups
-- Exercise history saved on workout completion (endSession saves to exerciseHistory)
 
 ---
 
-## What Failed / Issues Encountered
+## What Didn't Work / Issues Encountered
 
 | Issue | Resolution |
 |-------|-----------|
@@ -103,6 +98,8 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | Set type cycling was error-prone | Replaced with popup picker showing all options with labels and colors |
 | Warmup sets added at end | Created `insertSetAtBeginning` that inserts after last warmup, before working sets |
 | Working set numbers wrong after adding warmups | Computed dynamically from position among working sets only |
+| Custom exercises showed "Unknown" in active workout | `getExercise` was a module-level function only searching static JSON. Fixed by pulling `customExercises` from the store, building `allExercises = [...builtInExercises, ...customExercises]` in the component, and passing it as a prop to `ExerciseBlock` |
+| VS Code "Cannot use JSX unless '--jsx' flag is provided" error | Created `.vscode/settings.json` with `"typescript.tsdk": "node_modules/typescript/lib"` to use workspace TypeScript instead of VS Code's built-in version |
 
 ---
 
@@ -114,8 +111,10 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | `package.json` | Dependencies (Expo 52, Zustand, op-sqlite, victory-native, etc.) |
 | `app.json` | Expo config (dark mode, HealthKit permissions, plugins) |
 | `tsconfig.json` | TypeScript config with `@/*` path alias |
+| `.vscode/settings.json` | Points VS Code to workspace TypeScript (fixes JSX error) |
 | `PLAN.md` | Full implementation plan and architecture |
 | `HANDOFF.md` | This file |
+| `README.md` | Project overview, setup instructions, feature list, roadmap |
 
 ### Screens (`app/`)
 | File | Purpose |
@@ -127,12 +126,12 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | `app/(tabs)/sleep.tsx` | 5-factor sleep score breakdown + stages + 7-day history |
 | `app/(tabs)/activity.tsx` | Steps, Active Minutes, Calories, Distance + 7-day history |
 | `app/(tabs)/heart.tsx` | Resting HR, HRV, Readiness, Stress + 7-day histories |
-| `app/(tabs)/workout.tsx` | Workout home: start empty, resume active, templates (tap for preview modal), history link |
+| `app/(tabs)/workout.tsx` | Workout home: start empty, resume active, templates (tap for preview modal), history link. Seed templates loaded here on first mount via `useEffect` |
 | `app/settings/_layout.tsx` | Settings stack layout |
 | `app/settings/index.tsx` | Data source connections, goals, preferences (back arrow top left) |
 | `app/workout/_layout.tsx` | Workout stack layout |
-| `app/workout/active.tsx` | Active workout session (Strong-style UI with rest timer, set type picker, history carry-over) |
-| `app/workout/exercises.tsx` | Exercise picker with search + muscle group filter chips |
+| `app/workout/active.tsx` | Active workout session. Receives `allExercises` built from builtIn + custom for exercise name lookup. 3-dot menu includes Replace Exercise |
+| `app/workout/exercises.tsx` | Exercise picker. Modes: `pick` (multi-select), `replace` (single-tap). Has create modal (reused for edit), search-to-create empty state, pencil edit button on custom exercises |
 | `app/workout/template.tsx` | Template editor (create/edit, add exercises, sets/rest config with +/-15s stepper) |
 | `app/workout/history.tsx` | Workout history (empty state, ready for data) |
 
@@ -150,8 +149,8 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | File | Purpose |
 |------|---------|
 | `src/stores/healthStore.ts` | Today's health metrics + history arrays (auto-loads mock on web) |
-| `src/stores/workoutStore.ts` | Active session, exercises, sets, templates, rest timer, pinned notes, exercise history |
-| `src/stores/exercisePickerStore.ts` | Temporary selection state for passing exercises between screens |
+| `src/stores/workoutStore.ts` | Active session, exercises, sets, templates, `customExercises`, rest timer, pinned notes, exercise history (pre-seeded for 10 exercises). Actions: `addCustomExercise`, `updateCustomExercise`, `replaceExerciseInSession` |
+| `src/stores/exercisePickerStore.ts` | Temporary selection state + `replaceTargetId` for replace flow |
 | `src/stores/settingsStore.ts` | Connection states, goals, unit preferences |
 
 ### Database (`src/db/`)
@@ -170,7 +169,7 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | `activity.ts` | `DailyActivity`, `WorkoutRecord` |
 | `heart.ts` | `DailyHeartMetrics` (HR, HRV, stress, readiness) |
 | `recovery.ts` | `DailyRecovery` (computed score) |
-| `workout.ts` | `Exercise`, `WorkoutTemplate`, `WorkoutSession`, `WorkoutSet` (with `restSeconds` per-set override), `MuscleGroup`, `Equipment`, `SetType` |
+| `workout.ts` | `Exercise`, `WorkoutTemplate`, `WorkoutSession`, `WorkoutSet`, `MuscleGroup`, `Equipment`, `SetType` |
 
 ### Services (`src/services/`)
 | File | Purpose |
@@ -179,23 +178,15 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | `src/services/dataMerge/priorities.ts` | Source priority config per metric type |
 | `src/services/dataMerge/deduplicator.ts` | Time-overlap detection, dedup utility |
 
-### Utils (`src/utils/`)
+### Utils / Data / Theme
 | File | Purpose |
 |------|---------|
-| `src/utils/sleepScoring.ts` | 5-factor sleep score (Duration, Bedtime, Architecture, Stress/Recovery, Interruptions) |
-
-### Data (`src/data/`)
-| File | Purpose |
-|------|---------|
+| `src/utils/sleepScoring.ts` | 5-factor sleep score algorithm |
 | `src/data/exercises.json` | Pre-built exercise library (40 exercises, all muscle groups) |
 | `src/data/mockData.ts` | Mock health data + seeded weekly history generator |
-
-### Theme (`src/theme/`)
-| File | Purpose |
-|------|---------|
-| `colors.ts` | Dark palette (background, surfaces, metric accents) |
-| `spacing.ts` | Spacing scale (xs through xxxl) + border radii |
-| `typography.ts` | Font styles (h1-h3, body, caption, metric) |
+| `src/theme/colors.ts` | Dark palette (background, surfaces, metric accents) |
+| `src/theme/spacing.ts` | Spacing scale (xs through xxxl) + border radii |
+| `src/theme/typography.ts` | Font styles (h1-h3, body, caption, metric) |
 
 ---
 
@@ -207,8 +198,9 @@ interface WorkoutState {
   activeExercises: ActiveExercise[];       // exerciseId, notes, notesPinned, restSeconds
   activeSets: WorkoutSet[];
   templates: WorkoutTemplate[];
-  pinnedNotes: Record<string, string>;     // exerciseId -> persistent note (survives across sessions)
-  exerciseHistory: Record<string, {        // exerciseId -> last session's sets
+  customExercises: Exercise[];             // user-created, persists in Zustand
+  pinnedNotes: Record<string, string>;     // exerciseId -> persistent note
+  exerciseHistory: Record<string, {        // exerciseId -> last session's sets (pre-seeded for 10 exercises)
     weight: number | null;
     reps: number | null;
     type: SetType;
@@ -224,8 +216,10 @@ interface WorkoutState {
 Key behaviors:
 - `endSession()` saves completed sets into `exerciseHistory` before clearing active state
 - `addExerciseToSession()` loads pinned notes and creates sets from history (or 1 empty set)
+- `replaceExerciseInSession()` swaps exercise in-place, loads new exercise's history, preserves rest time
 - `insertSetAtBeginning()` places warmup sets after existing warmups but before working sets
 - `toggleExerciseNotePin()` toggles between session-only and persistent notes
+- `addCustomExercise()` / `updateCustomExercise()` manage user-created exercises
 - Working set numbers computed dynamically at render time (not stored)
 
 ---
@@ -234,25 +228,25 @@ Key behaviors:
 
 ### Immediate (Phase 3 completion)
 
-1. **PR detection** — When a set is completed, compare weight x reps to the exercise's all-time best stored in `exerciseHistory`. If it's a new PR, flag `isPersonalRecord: true` and show a visual indicator (trophy icon on the set row).
+1. **PR detection** — When a set is completed, compare weight × reps to the exercise's all-time best. If new PR, set `isPersonalRecord: true` and show a trophy icon on the set row. Requires tracking an `allTimeBest` record per exercise alongside `exerciseHistory`.
 
-2. **Persist completed workouts** — When "Finish" is tapped, save the full session + sets to a `completedWorkouts` array in the store. Currently `endSession()` only saves per-exercise history (last sets), not the full workout record with date/duration/volume.
+2. **Persist completed workouts** — `endSession()` currently only saves per-exercise history (last sets), not the full workout record. Add a `completedWorkouts` array to the store. Save date, duration (endTime - startTime), total volume (sum of weight × reps), exercise count, and all sets.
 
-3. **Populate workout history screen** — Wire completed workouts into `app/workout/history.tsx` with date, duration, total volume (weight x reps sum), exercise count per session.
+3. **Populate workout history screen** — Wire `completedWorkouts` into `app/workout/history.tsx` showing date, duration, total volume, exercise count per session. Tap to expand and see per-exercise sets.
 
-4. **Pre-populate sets from template** — When starting from a template, auto-create the target number of set rows per exercise (currently only adds exercises; sets come from history or default to 1). Should use `max(template.targetSets, historySetCount)`.
+4. **Pre-populate sets from template** — When starting from a template, auto-create `max(template.targetSets, historySetCount)` set rows per exercise. Currently sets come from history only (default 1 if no history).
 
 5. **Expand exercise library** — Go from 40 to 200+ exercises in `exercises.json`.
 
 6. **Superset support** — Allow grouping exercises in the template editor and active workout (shared rest timer between superset exercises).
 
-7. **Zustand persistence** — Add `zustand/middleware` persist with AsyncStorage so `pinnedNotes`, `exerciseHistory`, `templates`, and `completedWorkouts` survive app restarts.
+7. **Zustand persistence** — Add `zustand/middleware` persist with AsyncStorage so `pinnedNotes`, `exerciseHistory`, `templates`, `customExercises`, and `completedWorkouts` survive app restarts.
 
 ### Phase 2: Garmin API Integration
 
 8. **Cloudflare Worker** — Deploy `functions/garmin-token-exchange.ts` for OAuth 1.0a token exchange.
 
-9. **Garmin OAuth flow** — In-app OAuth: open browser -> authorize -> callback -> store tokens in expo-secure-store.
+9. **Garmin OAuth flow** — In-app OAuth: open browser → authorize → callback → store tokens in expo-secure-store.
 
 10. **Garmin data fetch** — Pull Body Battery, stress, detailed sleep stages, HRV from Garmin Connect API.
 
@@ -296,10 +290,6 @@ npx expo install <package-name>
 
 # Fix dependency versions for current SDK
 npx expo install --fix
-
-# Future: iOS build
-npm install -g eas-cli
-eas build --profile development --platform ios
 ```
 
 ---
@@ -326,6 +316,9 @@ eas build --profile development --platform ios
 | Working set numbers | Computed dynamically from position among working sets (1, 2, 3...), ignoring warmups/drops/failures |
 | Warmup set insertion | Inserts after existing warmups, before first working set |
 | Set type selection | Popup picker (not cycling) to prevent accidental type changes |
+| Custom exercise lookup must use store | `getExercise` must never be a static module-level function — custom exercises live in Zustand, so lookup must use `[...builtInExercises, ...customExercises]` built inside the component |
+| Replace exercise via picker store | `replaceTargetId` stored in `exercisePickerStore` before navigating to picker; cleared after swap so normal "add" flow still works |
+| Edit vs select button spacing | `gap: spacing.lg` + `padding` + `hitSlop: 12` on pencil button to prevent mis-taps |
 | Weight unit: kg | Stored in settings store |
 | SQLite via op-sqlite | Fast, offline-first, works with Expo dev client |
 | No Apple Developer account yet | All development via web preview; native build deferred |

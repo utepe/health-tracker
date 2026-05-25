@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { WorkoutSession, WorkoutSet, WorkoutTemplate, SetType } from '../models/workout';
+import { Exercise, WorkoutSession, WorkoutSet, WorkoutTemplate, SetType } from '../models/workout';
 
 export interface ActiveExercise {
   exerciseId: string;
@@ -13,18 +13,20 @@ interface WorkoutState {
   activeExercises: ActiveExercise[];
   activeSets: WorkoutSet[];
   templates: WorkoutTemplate[];
-  pinnedNotes: Record<string, string>; // exerciseId -> persistent note
-  exerciseHistory: Record<string, { weight: number | null; reps: number | null; type: SetType }[]>; // exerciseId -> last session's sets
+  customExercises: Exercise[]; // user-created exercises that persist
+  pinnedNotes: Record<string, string>;
+  exerciseHistory: Record<string, { weight: number | null; reps: number | null; type: SetType }[]>;
   restTimerEnd: number | null;
-  restTimerDuration: number; // total rest in seconds
+  restTimerDuration: number;
   restTimerPaused: boolean;
-  restTimerPausedRemaining: number | null; // ms remaining when paused
-  restTimerSetId: string | null; // which set triggered the rest timer
+  restTimerPausedRemaining: number | null;
+  restTimerSetId: string | null;
 
   startSession: (session: WorkoutSession) => void;
   endSession: () => void;
   addExerciseToSession: (exerciseId: string, restSeconds?: number) => void;
   removeExerciseFromSession: (exerciseId: string) => void;
+  replaceExerciseInSession: (oldExerciseId: string, newExerciseId: string) => void;
   updateExerciseNotes: (exerciseId: string, notes: string) => void;
   toggleExerciseNotePin: (exerciseId: string) => void;
   updateExerciseRest: (exerciseId: string, restSeconds: number) => void;
@@ -33,6 +35,8 @@ interface WorkoutState {
   updateSet: (id: string, updates: Partial<WorkoutSet>) => void;
   removeSet: (id: string) => void;
   setTemplates: (templates: WorkoutTemplate[]) => void;
+  addCustomExercise: (exercise: Exercise) => void;
+  updateCustomExercise: (id: string, updates: Partial<Omit<Exercise, 'id' | 'isCustom'>>) => void;
   startRestTimer: (seconds: number, setId?: string) => void;
   adjustRestTimer: (deltaSeconds: number) => void;
   pauseRestTimer: () => void;
@@ -46,8 +50,60 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
   activeExercises: [],
   activeSets: [],
   templates: [],
+  customExercises: [],
   pinnedNotes: {},
-  exerciseHistory: {},
+  exerciseHistory: {
+    // Pre-seeded history so the "previous" column shows real data on first launch
+    'ex_bench_press': [
+      { weight: 80, reps: 5, type: 'working' },
+      { weight: 80, reps: 5, type: 'working' },
+      { weight: 80, reps: 4, type: 'working' },
+    ],
+    'ex_barbell_row': [
+      { weight: 70, reps: 6, type: 'working' },
+      { weight: 70, reps: 6, type: 'working' },
+      { weight: 70, reps: 5, type: 'working' },
+    ],
+    'ex_squat': [
+      { weight: 100, reps: 5, type: 'working' },
+      { weight: 100, reps: 5, type: 'working' },
+      { weight: 100, reps: 4, type: 'working' },
+    ],
+    'ex_deadlift': [
+      { weight: 120, reps: 5, type: 'working' },
+      { weight: 120, reps: 3, type: 'working' },
+    ],
+    'ex_overhead_press': [
+      { weight: 55, reps: 6, type: 'working' },
+      { weight: 55, reps: 6, type: 'working' },
+      { weight: 55, reps: 5, type: 'working' },
+    ],
+    'ex_pull_up': [
+      { weight: null, reps: 10, type: 'working' },
+      { weight: null, reps: 8, type: 'working' },
+      { weight: null, reps: 7, type: 'working' },
+    ],
+    'ex_dumbbell_curl': [
+      { weight: 14, reps: 10, type: 'working' },
+      { weight: 14, reps: 10, type: 'working' },
+      { weight: 14, reps: 8, type: 'working' },
+    ],
+    'ex_tricep_pushdown': [
+      { weight: 35, reps: 12, type: 'working' },
+      { weight: 35, reps: 12, type: 'working' },
+      { weight: 35, reps: 10, type: 'working' },
+    ],
+    'ex_lateral_raise': [
+      { weight: 10, reps: 15, type: 'working' },
+      { weight: 10, reps: 15, type: 'working' },
+      { weight: 10, reps: 12, type: 'working' },
+    ],
+    'ex_leg_press': [
+      { weight: 160, reps: 10, type: 'working' },
+      { weight: 160, reps: 10, type: 'working' },
+      { weight: 160, reps: 8, type: 'working' },
+    ],
+  },
   restTimerEnd: null,
   restTimerDuration: 120,
   restTimerPaused: false,
@@ -132,6 +188,68 @@ export const useWorkoutStore = create<WorkoutState>((set) => ({
     set((state) => ({
       activeExercises: state.activeExercises.filter((e) => e.exerciseId !== exerciseId),
       activeSets: state.activeSets.filter((s) => s.exerciseId !== exerciseId),
+    })),
+
+  replaceExerciseInSession: (oldExerciseId, newExerciseId) =>
+    set((state) => {
+      const oldEntry = state.activeExercises.find((e) => e.exerciseId === oldExerciseId);
+      const pinnedNote = state.pinnedNotes[newExerciseId] ?? '';
+      const history = state.exerciseHistory[newExerciseId];
+      const sessionId = state.activeSession?.id ?? '';
+
+      let newSets: WorkoutSet[];
+      if (history && history.length > 0) {
+        newSets = history.map((prev, i) => ({
+          id: `set_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${i}`,
+          sessionId,
+          exerciseId: newExerciseId,
+          setNumber: i + 1,
+          type: prev.type,
+          weight: prev.weight,
+          reps: prev.reps,
+          rpe: null,
+          durationSeconds: null,
+          restSeconds: null,
+          isPersonalRecord: false,
+          completedAt: '',
+        }));
+      } else {
+        newSets = [{
+          id: `set_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          sessionId,
+          exerciseId: newExerciseId,
+          setNumber: 1,
+          type: 'working' as SetType,
+          weight: null,
+          reps: null,
+          rpe: null,
+          durationSeconds: null,
+          restSeconds: null,
+          isPersonalRecord: false,
+          completedAt: '',
+        }];
+      }
+
+      return {
+        activeExercises: state.activeExercises.map((e) =>
+          e.exerciseId === oldExerciseId
+            ? { ...e, exerciseId: newExerciseId, notes: pinnedNote, notesPinned: pinnedNote.length > 0 }
+            : e
+        ),
+        activeSets: [
+          ...state.activeSets.filter((s) => s.exerciseId !== oldExerciseId),
+          ...newSets,
+        ],
+      };
+    }),
+
+  addCustomExercise: (exercise) =>
+    set((state) => ({ customExercises: [...state.customExercises, exercise] })),
+  updateCustomExercise: (id, updates) =>
+    set((state) => ({
+      customExercises: state.customExercises.map((e) =>
+        e.id === id ? { ...e, ...updates } : e
+      ),
     })),
 
   updateExerciseNotes: (exerciseId, notes) =>

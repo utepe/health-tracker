@@ -2,7 +2,7 @@
 
 A personal health tracking mobile app built with React Native/Expo. Merges data from multiple wearables (Garmin Forerunner 255, future Fitbit Air) into a unified dashboard and includes a full-featured strength training workout planner.
 
-**Current status:** Phase 1 (Health Dashboard) complete. Phase 3 (Workout Planner) ~85% complete. Running on web preview — native iOS build deferred pending Apple Developer account.
+**Current status:** Phase 1 (Health Dashboard) complete. Phase 3 (Workout Planner) ~90% complete. Running on web preview — native iOS build deferred pending Apple Developer account.
 
 ---
 
@@ -19,17 +19,20 @@ A personal health tracking mobile app built with React Native/Expo. Merges data 
 - Mock data with seeded pseudo-random values for stable development renders
 
 ### Workout Planner (Strong-style)
-- Exercise library with search and muscle group filter chips (40 exercises; 200+ planned)
+- Exercise library with search and muscle group filter chips (40 built-in exercises; 200+ planned)
+- **Custom exercises:** create via "+" button (name, muscle group, equipment, instructions), edit via pencil icon, "Custom" badge in list
+- **Search-to-create:** searching for a non-existent exercise shows a "Create '[name]'" prompt with the name pre-filled
+- 3 seed templates on first launch: Push Day A, Pull Day A, Legs Day A
 - Template CRUD: create/edit with per-exercise target sets, rest time (+/-15s stepper), reorder, delete
 - Template preview modal: overview card with Start / Edit actions
 - **Active workout screen:**
   - Strong-style set table: SET | PREVIOUS | KG | REPS | ✓
-  - Exercise history carry-over (auto-fills weight/reps from last session)
+  - Exercise history carry-over (auto-fills weight/reps from last session; pre-seeded for 10 common exercises)
   - Set type picker (popup): Working / Warmup / Dropset / Failure with color coding
   - Working set numbers computed dynamically (1, 2, 3… ignoring warmup/drop/failure sets)
   - Warmup sets inserted after existing warmups, before first working set
   - Pinned notes (yellow banner, persists across sessions) vs. session-only notes
-  - Per-exercise 3-dot menu: Add Note, Update Rest Timer, Add Warm-up Set, Remove Exercise
+  - Per-exercise 3-dot menu: Add Note, Update Rest Timer, Add Warm-up Set, **Replace Exercise**, Remove Exercise
   - **Inline rest timer progress bar** with: -10s, Pause/Resume, Reset, +10s, Skip controls
   - Falls back to top-of-screen banner only when timer is completely off-screen
   - Minimize (chevron-down) to navigate away; session persists in Zustand
@@ -84,8 +87,8 @@ health-tracker/
 │   │   └── workout/              # TemplatePreviewModal
 │   ├── stores/
 │   │   ├── healthStore.ts        # Today's health metrics + history
-│   │   ├── workoutStore.ts       # Active session, sets, templates, rest timer, pinned notes
-│   │   ├── exercisePickerStore.ts # Temporary selection state between screens
+│   │   ├── workoutStore.ts       # Active session, sets, templates, customExercises, rest timer, pinned notes, exercise history
+│   │   ├── exercisePickerStore.ts # Temporary selection state + replaceTargetId between screens
 │   │   └── settingsStore.ts      # Connections, goals, unit preferences
 │   ├── db/
 │   │   ├── schema.ts             # SQLite table definitions
@@ -183,14 +186,22 @@ eas build --profile development --platform ios
 
 ## Roadmap
 
-### Phase 3 — Workout Planner (in progress, ~85%)
+### Phase 3 — Workout Planner (in progress, ~90%)
+- [x] Exercise picker with search, filter, and muscle group chips
+- [x] Template CRUD with per-exercise rest time config
+- [x] Active workout screen (set logging, rest timer, set types, pinned notes)
+- [x] Exercise history carry-over with pre-seeded data
+- [x] Replace exercise from 3-dot menu
+- [x] Create custom exercises (name, muscle group, equipment, instructions)
+- [x] Edit custom exercises
+- [x] Search-to-create prompt when no results found
 - [ ] PR detection (compare weight×reps to all-time best, show trophy icon)
 - [ ] Persist completed workouts to `completedWorkouts` in store
 - [ ] Wire workout history screen with date, duration, volume, exercise count
 - [ ] Pre-populate sets from template target (`max(template.targetSets, historySetCount)`)
 - [ ] Expand exercise library to 200+ exercises
 - [ ] Superset support (shared rest timer between grouped exercises)
-- [ ] Zustand persist middleware (AsyncStorage) for notes, history, templates
+- [ ] Zustand persist middleware (AsyncStorage) for notes, history, templates, custom exercises
 
 ### Phase 2 — Garmin API
 - [ ] Deploy Cloudflare Worker for OAuth 1.0a token exchange
@@ -228,4 +239,6 @@ eas build --profile development --platform ios
 | Active workout persists on navigation | Zustand state survives route changes; chevron-down minimizes, resume banner brings it back |
 | Warmup set insertion order | Inserted after existing warmups, before first working set |
 | Working set numbers computed at render | Not stored; derived from position among working sets only |
+| Custom exercise lookup uses store | `allExercises` built from `[...builtInExercises, ...customExercises]` inside the component — static module-level lookup would miss Zustand-stored custom exercises |
+| Replace exercise via picker store | `replaceTargetId` stored in `exercisePickerStore` before navigating; cleared after swap so normal add flow still works |
 | SQLite via op-sqlite | Fast, offline-first, compatible with Expo Dev Client |
