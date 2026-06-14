@@ -1,5 +1,5 @@
 import { SleepRecord } from '../models/sleep';
-import { DailyActivity } from '../models/activity';
+import { DailyActivity, WorkoutRecord } from '../models/activity';
 import { DailyHeartMetrics } from '../models/heart';
 import { DailyRecovery } from '../models/recovery';
 import { format, subDays } from 'date-fns';
@@ -54,6 +54,77 @@ export const mockHeart: DailyHeartMetrics = {
   createdAt: new Date().toISOString(),
   syncedAt: null,
 };
+
+export const mockWorkoutRecords: WorkoutRecord[] = [
+  {
+    id: 'mock_workout_run_1',
+    source: 'garmin',
+    sourceId: 'garmin_run_today',
+    date: today,
+    activityType: 'run',
+    name: 'Morning Run',
+    durationMinutes: 38,
+    caloriesBurned: 340,
+    avgHeartRate: 152,
+    maxHeartRate: 171,
+    vo2max: 48.2,
+    trainingLoad: 62,
+    distanceMeters: 5800,
+    createdAt: new Date().toISOString(),
+    syncedAt: null,
+  },
+  {
+    id: 'mock_workout_strength_1',
+    source: 'garmin',
+    sourceId: 'garmin_strength_2d',
+    date: format(subDays(new Date(), 2), 'yyyy-MM-dd'),
+    activityType: 'strength',
+    name: 'Push Day A',
+    durationMinutes: 55,
+    caloriesBurned: 280,
+    avgHeartRate: 118,
+    maxHeartRate: 145,
+    vo2max: null,
+    trainingLoad: 45,
+    distanceMeters: null,
+    createdAt: new Date().toISOString(),
+    syncedAt: null,
+  },
+  {
+    id: 'mock_workout_cycle_1',
+    source: 'garmin',
+    sourceId: 'garmin_cycle_3d',
+    date: format(subDays(new Date(), 3), 'yyyy-MM-dd'),
+    activityType: 'cycle',
+    name: 'Evening Ride',
+    durationMinutes: 62,
+    caloriesBurned: 490,
+    avgHeartRate: 141,
+    maxHeartRate: 168,
+    vo2max: null,
+    trainingLoad: 88,
+    distanceMeters: 22400,
+    createdAt: new Date().toISOString(),
+    syncedAt: null,
+  },
+  {
+    id: 'mock_workout_run_2',
+    source: 'garmin',
+    sourceId: 'garmin_run_5d',
+    date: format(subDays(new Date(), 5), 'yyyy-MM-dd'),
+    activityType: 'run',
+    name: 'Easy Run',
+    durationMinutes: 30,
+    caloriesBurned: 255,
+    avgHeartRate: 138,
+    maxHeartRate: 158,
+    vo2max: null,
+    trainingLoad: 38,
+    distanceMeters: 4200,
+    createdAt: new Date().toISOString(),
+    syncedAt: null,
+  },
+];
 
 export const mockRecovery: DailyRecovery = {
   id: 'mock_recovery_today',

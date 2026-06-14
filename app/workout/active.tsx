@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
@@ -45,6 +46,12 @@ export default function ActiveWorkoutScreen() {
     exerciseHistory,
     checkAndMarkPR,
     endSession,
+    cancelSession,
+    setSessionName,
+    setSessionNotes,
+    sessionNotes,
+    saveAsTemplate,
+    updateTemplateFromWorkout,
     restTimerEnd,
     restTimerDuration,
     restTimerPaused,
@@ -62,6 +69,10 @@ export default function ActiveWorkoutScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [restRemaining, setRestRemaining] = useState(0);
   const [inlineTimerVisible, setInlineTimerVisible] = useState(true);
+  const [showShortWorkoutModal, setShowShortWorkoutModal] = useState(false);
+  const [showWorkoutMenu, setShowWorkoutMenu] = useState(false);
+  const titleInputRef = useRef<TextInput>(null);
+  const notesInputRef = useRef<TextInput>(null);
   const scrollRef = useRef<ScrollView>(null);
   const inlineTimerRef = useRef<View>(null);
   const headerHeight = useRef(0);
@@ -109,6 +120,11 @@ export default function ActiveWorkoutScreen() {
   }, [restTimerEnd]);
 
   const handleFinishWorkout = () => {
+    const elapsedMinutes = elapsed / 60000;
+    if (elapsedMinutes < 5) {
+      setShowShortWorkoutModal(true);
+      return;
+    }
     const completedSets = activeSets.filter((s) => s.completedAt !== '');
     if (Platform.OS === 'web') {
       if (window.confirm(`Finish workout with ${completedSets.length} set${completedSets.length !== 1 ? 's' : ''}?`)) {
@@ -130,7 +146,7 @@ export default function ActiveWorkoutScreen() {
   const handleCancelWorkout = () => {
     if (Platform.OS === 'web') {
       if (window.confirm('Discard workout? All progress will be lost.')) {
-        endSession();
+        cancelSession();
         router.back();
       }
     } else {
@@ -140,7 +156,7 @@ export default function ActiveWorkoutScreen() {
         'Are you sure? All progress will be lost.',
         [
           { text: 'Keep Going', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => { endSession(); router.back(); } },
+          { text: 'Discard', style: 'destructive', onPress: () => { cancelSession(); router.back(); } },
         ]
       );
     }
@@ -160,6 +176,8 @@ export default function ActiveWorkoutScreen() {
           workout={lastCompletedWorkout}
           allExercises={[...builtInExercises, ...customExercises]}
           onClose={() => { clearLastCompletedWorkout(); router.back(); }}
+          onUpdateTemplate={lastCompletedWorkout?.templateId ? () => updateTemplateFromWorkout(lastCompletedWorkout.templateId!, lastCompletedWorkout) : undefined}
+          onSaveAsTemplate={!lastCompletedWorkout?.templateId ? (name) => saveAsTemplate(name, lastCompletedWorkout!) : undefined}
         />
       </SafeAreaView>
     );
@@ -249,12 +267,43 @@ export default function ActiveWorkoutScreen() {
         {/* Workout Title + Notes */}
         <View style={styles.workoutHeader}>
           <View style={styles.workoutTitleRow}>
-            <Text style={styles.workoutTitle}>{activeSession.name}</Text>
-            <Pressable style={styles.iconBtn}>
+            <TextInput
+              ref={titleInputRef}
+              style={styles.workoutTitle}
+              value={activeSession.name}
+              onChangeText={setSessionName}
+              placeholder="Workout name"
+              placeholderTextColor={colors.textTertiary}
+              returnKeyType="done"
+            />
+            <Pressable style={styles.iconBtn} onPress={() => setShowWorkoutMenu((v) => !v)}>
               <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
             </Pressable>
           </View>
-          <Text style={styles.workoutNotes}>Notes</Text>
+          {showWorkoutMenu && (
+            <View style={styles.workoutMenu}>
+              <Pressable style={styles.workoutMenuItem} onPress={() => { setShowWorkoutMenu(false); titleInputRef.current?.focus(); }}>
+                <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
+                <Text style={styles.workoutMenuText}>Edit Name</Text>
+              </Pressable>
+              <Pressable style={styles.workoutMenuItem} onPress={() => { setShowWorkoutMenu(false); notesInputRef.current?.focus(); }}>
+                <Ionicons name="document-text-outline" size={16} color={colors.textSecondary} />
+                <Text style={styles.workoutMenuText}>Add Notes</Text>
+              </Pressable>
+            </View>
+          )}
+          <Pressable onPress={() => notesInputRef.current?.focus()}>
+            <TextInput
+              ref={notesInputRef}
+              style={styles.workoutNotes}
+              value={sessionNotes}
+              onChangeText={setSessionNotes}
+              placeholder="Notes"
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              pointerEvents="none"
+            />
+          </Pressable>
         </View>
 
         {/* Exercise Blocks */}
@@ -312,6 +361,31 @@ export default function ActiveWorkoutScreen() {
 
         <View style={{ height: 60 }} />
       </ScrollView>
+      {/* Short workout modal — shown when finishing before 5 minutes */}
+      <Modal visible={showShortWorkoutModal} transparent animationType="fade" onRequestClose={() => setShowShortWorkoutModal(false)}>
+        <Pressable style={styles.shortWorkoutOverlay} onPress={() => setShowShortWorkoutModal(false)}>
+          <Pressable style={styles.shortWorkoutCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.shortWorkoutTitle}>Short Workout</Text>
+            <Text style={styles.shortWorkoutBody}>
+              This workout is only {formatDuration(elapsed)} long. What would you like to do?
+            </Text>
+            <Pressable style={styles.shortWorkoutFinish} onPress={() => { setShowShortWorkoutModal(false); endSession(); }}>
+              <Text style={styles.shortWorkoutFinishText}>Finish Workout</Text>
+            </Pressable>
+            <Pressable style={styles.shortWorkoutCancel} onPress={() => {
+              setShowShortWorkoutModal(false);
+              cancelSession();
+              router.back();
+            }}>
+              <Text style={styles.shortWorkoutCancelText}>Cancel Workout</Text>
+            </Pressable>
+            <Pressable style={styles.shortWorkoutKeepGoing} onPress={() => setShowShortWorkoutModal(false)}>
+              <Text style={styles.shortWorkoutKeepGoingText}>Keep Going</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <WorkoutSummaryModal
         visible={lastCompletedWorkout !== null}
         workout={lastCompletedWorkout}
@@ -531,8 +605,8 @@ function ExerciseBlock({
             multiline
           />
           <Pressable onPress={onTogglePin} hitSlop={8} style={styles.pinButton}>
-            <Ionicons
-              name={activeExercise.notesPinned ? 'pin' : 'pin-outline'}
+            <MaterialIcons
+              name="push-pin"
               size={16}
               color={activeExercise.notesPinned ? colors.warning : colors.textTertiary}
             />
@@ -652,12 +726,13 @@ function SetRow({
 }) {
   const [weight, setWeight] = useState(set.weight?.toString() ?? '');
   const [reps, setReps] = useState(set.reps?.toString() ?? '');
-  const [completed, setCompleted] = useState(false);
+  const [completed, setCompleted] = useState(set.completedAt !== '');
   const [showTypePicker, setShowTypePicker] = useState(false);
 
   const handleCheck = () => {
     if (completed) {
       setCompleted(false);
+      onUpdate({ completedAt: '' });
       return;
     }
     const w = weight ? parseFloat(weight) : null;
@@ -897,6 +972,25 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textTertiary,
     marginTop: spacing.xs,
+  },
+  workoutMenu: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 8,
+    padding: spacing.xs,
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  workoutMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  workoutMenuText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   // Exercise Block
   exerciseBlock: {
@@ -1289,5 +1383,63 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.background,
     fontWeight: '600',
+  },
+  shortWorkoutOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  shortWorkoutCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.xl,
+    width: '100%',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  shortWorkoutTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  shortWorkoutBody: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  shortWorkoutFinish: {
+    backgroundColor: colors.activity,
+    borderRadius: 10,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  shortWorkoutFinishText: {
+    ...typography.body,
+    color: '#000',
+    fontWeight: '700',
+  },
+  shortWorkoutCancel: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 10,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  shortWorkoutCancelText: {
+    ...typography.body,
+    color: colors.error,
+    fontWeight: '600',
+  },
+  shortWorkoutKeepGoing: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  shortWorkoutKeepGoingText: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
 });

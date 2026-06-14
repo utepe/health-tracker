@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CompletedWorkout, Exercise, WorkoutSession, WorkoutSet, WorkoutTemplate, SetType } from '../models/workout';
 
 export interface ActiveExercise {
@@ -18,6 +20,7 @@ function calcVolume(weight: number | null, reps: number | null): number {
 
 interface WorkoutState {
   activeSession: WorkoutSession | null;
+  sessionNotes: string;
   activeExercises: ActiveExercise[];
   activeSets: WorkoutSet[];
   templates: WorkoutTemplate[];
@@ -35,7 +38,10 @@ interface WorkoutState {
   restTimerSetId: string | null;
 
   startSession: (session: WorkoutSession) => void;
+  setSessionName: (name: string) => void;
+  setSessionNotes: (notes: string) => void;
   endSession: () => void;
+  cancelSession: () => void;
   clearLastCompletedWorkout: () => void;
   addExerciseToSession: (exerciseId: string, restSeconds?: number) => void;
   removeExerciseFromSession: (exerciseId: string) => void;
@@ -49,6 +55,10 @@ interface WorkoutState {
   updateSet: (id: string, updates: Partial<WorkoutSet>) => void;
   removeSet: (id: string) => void;
   setTemplates: (templates: WorkoutTemplate[]) => void;
+  saveAsTemplate: (name: string, workout: CompletedWorkout) => void;
+  updateTemplateFromWorkout: (templateId: string, workout: CompletedWorkout) => void;
+  deleteCompletedWorkout: (id: string) => void;
+  renameCompletedWorkout: (id: string, name: string) => void;
   addCustomExercise: (exercise: Exercise) => void;
   updateCustomExercise: (id: string, updates: Partial<Omit<Exercise, 'id' | 'isCustom'>>) => void;
   startRestTimer: (seconds: number, setId?: string) => void;
@@ -59,8 +69,11 @@ interface WorkoutState {
   clearRestTimer: () => void;
 }
 
-export const useWorkoutStore = create<WorkoutState>((set, get) => ({
+export const useWorkoutStore = create<WorkoutState>()(
+  persist(
+    (set, get) => ({
   activeSession: null,
+  sessionNotes: '',
   activeExercises: [],
   activeSets: [],
   templates: [],
@@ -127,7 +140,9 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   restTimerPausedRemaining: null,
   restTimerSetId: null,
 
-  startSession: (session) => set({ activeSession: session, activeExercises: [], activeSets: [] }),
+  startSession: (session) => set({ activeSession: session, sessionNotes: '', activeExercises: [], activeSets: [], lastCompletedWorkout: null }),
+  setSessionName: (name) => set((state) => state.activeSession ? { activeSession: { ...state.activeSession, name } } : {}),
+  setSessionNotes: (notes) => set({ sessionNotes: notes }),
   endSession: () => {
     const state = get();
     if (!state.activeSession) return null;
@@ -161,20 +176,27 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const completed: CompletedWorkout = {
       id: state.activeSession.id,
       name: state.activeSession.name,
+      notes: state.sessionNotes,
       templateId: state.activeSession.templateId,
       startTime: state.activeSession.startTime,
       endTime,
       durationSeconds,
       totalVolumeKg,
       prCount,
-      exercises: exerciseOrder.map((exerciseId) => ({
-        exerciseId,
-        sets: completedSets.filter((s) => s.exerciseId === exerciseId),
-      })),
+      exercises: exerciseOrder.map((exerciseId) => {
+        const ae = state.activeExercises.find((e) => e.exerciseId === exerciseId);
+        return {
+          exerciseId,
+          sets: completedSets.filter((s) => s.exerciseId === exerciseId),
+          restSeconds: ae?.restSeconds ?? 120,
+          notes: ae?.notes ?? '',
+        };
+      }),
     };
 
     set({
       activeSession: null,
+      sessionNotes: '',
       activeExercises: [],
       activeSets: [],
       restTimerEnd: null,
@@ -184,6 +206,17 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     });
   },
 
+  cancelSession: () => set({
+    activeSession: null,
+    sessionNotes: '',
+    activeExercises: [],
+    activeSets: [],
+    restTimerEnd: null,
+    restTimerPaused: false,
+    restTimerPausedRemaining: null,
+    restTimerSetId: null,
+    lastCompletedWorkout: null,
+  }),
   clearLastCompletedWorkout: () => set({ lastCompletedWorkout: null }),
 
   addExerciseToSession: (exerciseId, restSeconds = 120) =>
@@ -390,6 +423,50 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   removeSet: (id) =>
     set((state) => ({ activeSets: state.activeSets.filter((s) => s.id !== id) })),
   setTemplates: (templates) => set({ templates }),
+  saveAsTemplate: (name, workout) => set((state) => {
+    const template: WorkoutTemplate = {
+      id: `tmpl_${Date.now()}`,
+      name,
+      exercises: workout.exercises.map((e, order) => ({
+        exerciseId: e.exerciseId,
+        order,
+        targetSets: e.sets.filter((s) => s.type === 'working').length || e.sets.length,
+        supersetGroup: null,
+        restSeconds: e.restSeconds,
+        notes: null,
+      })),
+      lastPerformed: workout.startTime,
+      createdAt: new Date().toISOString(),
+    };
+    return { templates: [...state.templates, template] };
+  }),
+  deleteCompletedWorkout: (id) =>
+    set((state) => ({ completedWorkouts: state.completedWorkouts.filter((w) => w.id !== id) })),
+  renameCompletedWorkout: (id, name) =>
+    set((state) => ({
+      completedWorkouts: state.completedWorkouts.map((w) => w.id === id ? { ...w, name } : w),
+    })),
+  updateTemplateFromWorkout: (templateId, workout) => set((state) => ({
+    templates: state.templates.map((t) => {
+      if (t.id !== templateId) return t;
+      return {
+        ...t,
+        lastPerformed: workout.startTime,
+        exercises: workout.exercises.map((e, order) => {
+          const existing = t.exercises.find((te) => te.exerciseId === e.exerciseId);
+          const workingCount = e.sets.filter((s) => s.type === 'working').length;
+          return {
+            exerciseId: e.exerciseId,
+            order,
+            targetSets: Math.max(existing?.targetSets ?? 0, workingCount || e.sets.length),
+            supersetGroup: existing?.supersetGroup ?? null,
+            restSeconds: e.restSeconds,
+            notes: existing?.notes ?? null,
+          };
+        }),
+      };
+    }),
+  })),
   startRestTimer: (seconds, setId) => set({
     restTimerEnd: Date.now() + seconds * 1000,
     restTimerDuration: seconds,
@@ -426,4 +503,27 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     restTimerPausedRemaining: null,
   })),
   clearRestTimer: () => set({ restTimerEnd: null, restTimerPaused: false, restTimerPausedRemaining: null, restTimerSetId: null }),
-}));
+    }),
+    {
+      name: 'workout-store',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        templates: state.templates,
+        customExercises: state.customExercises,
+        completedWorkouts: state.completedWorkouts,
+        exerciseHistory: state.exerciseHistory,
+        allTimeBest: state.allTimeBest,
+        pinnedNotes: state.pinnedNotes,
+        activeSession: state.activeSession,
+        sessionNotes: state.sessionNotes,
+        activeExercises: state.activeExercises,
+        activeSets: state.activeSets,
+        restTimerEnd: state.restTimerEnd,
+        restTimerDuration: state.restTimerDuration,
+        restTimerPaused: state.restTimerPaused,
+        restTimerPausedRemaining: state.restTimerPausedRemaining,
+        restTimerSetId: state.restTimerSetId,
+      }),
+    }
+  )
+);

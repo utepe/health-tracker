@@ -16,9 +16,9 @@ See `PLAN.md` for full architecture details and phased implementation roadmap.
 ## Current State
 
 **Phase 1 (Health Dashboard) — Complete.**
-**Phase 3 (Workout Planner) — ~95% complete.**
+**Phase 3 (Workout Planner) — ~75% complete.**
 
-The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs are functional. The workout planner now has a complete exercise management system: create, edit, search-to-create, and replace exercises. PR detection using Epley 1RM runs on every set completion. A full workout summary modal appears immediately after finishing, showing duration, volume, PRs, and per-exercise set breakdown.
+The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs are functional. This session added: full Zustand persistence (survives refreshes/crashes), unified workout history (strength + cardio), post-workout template management, editable workout name and notes, short-workout warning modal, and correct cancel-vs-finish separation.
 
 **No Apple Developer Account** — using web preview for UI development. Native iOS build deferred.
 
@@ -40,19 +40,21 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 - Progress bars stay within card bounds
 - All dependencies install successfully
 
-### Workout Planner (Phase 3 - ~90% complete)
+### Workout Planner (Phase 3 - ~98% complete)
 - Exercise picker with search and muscle group filter chips (ScrollView-based, not FlatList)
 - Template creation/editing (name, exercises, target sets, rest time per exercise via +/-15s stepper, reorder, delete)
-- **3 seed templates auto-loaded on first launch:** Push Day A, Pull Day A, Legs Day A (each with 5 exercises, correct rest times)
+- **3 seed templates auto-loaded on first launch:** Push Day A, Pull Day A, Legs Day A (each with 5 exercises, correct rest times). Seed only fires after Zustand hydration (`hasHydrated()` guard) to avoid overwriting persisted templates
 - Template preview modal (centered card, not full-screen) with exercise overview, start workout, edit
 - Active workout screen (Strong-style):
   - Minimize button (chevron-down) to navigate away while workout continues
   - Timer persists based on startTime (recalculates on re-entry)
-  - Workout title + 3-dot menu + notes placeholder
+  - **Editable workout name:** `TextInput` styled as heading — tap directly or use 3-dot menu → "Edit Name"
+  - **Editable workout notes:** multiline `TextInput` below title — tap directly or use 3-dot menu → "Add Notes". Stored in `sessionNotes` in the store, persisted, saved into `CompletedWorkout.notes` on finish
+  - **3-dot menu (workout level):** Edit Name, Add Notes
   - Per-exercise blocks: name, muscle/equipment label, progression icon, 3-dot menu
-  - 3-dot menu: Add Note, Update Rest Timer, Add Warm-up Set, **Replace Exercise**, Remove Exercise
+  - 3-dot menu (exercise level): Add Note, Update Rest Timer, Add Warm-up Set, **Replace Exercise**, Remove Exercise
   - **Replace Exercise flow:** tap → navigates to exercise picker in `mode=replace` (single-tap select, no checkboxes) → swaps exercise in-place, loads new exercise's history, preserves rest time config
-  - Notes with pin toggle (pinned = yellow banner, persists across sessions; unpinned = session-only)
+  - Notes with pin toggle (pinned = `push-pin` MaterialIcons icon, yellow, persists across sessions; unpinned = session-only)
   - Set table: SET | PREVIOUS | KG | REPS | checkmark
   - Set type picker (popup selector): Working/Warmup/Dropset/Failure with color coding
   - Working set numbering: always sequential (1, 2, 3...) based on working sets only
@@ -60,20 +62,46 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
   - Rest time label between set rows showing configured duration
   - Per-set rest override via `restSeconds` field (null = use exercise default)
   - "Add Set" per exercise, "Add Exercises" button, "Cancel Workout" button
-  - **Exercise history carry-over:** pre-seeded for 10 common exercises (Bench Press, Squat, Deadlift, OHP, Pull Up, Row, Curl, Tricep Pushdown, Lateral Raise, Leg Press). First time shows `—`, returning exercise auto-creates same number of sets with weight/reps pre-filled
+  - **Exercise history carry-over:** pre-seeded for 10 common exercises. First time shows `—`, returning exercise auto-creates same number of sets with weight/reps pre-filled. **Sets correctly restore as checked after app refresh** (initialised from `set.completedAt !== ''`, not hardcoded `false`)
   - **Rest timer progress bar** (inline): counts DOWN, full controls (−10s, Pause/Resume, Reset, +10s, Skip). Falls back to top banner when completely off-screen
   - Web-compatible confirm dialogs (window.confirm on web, Alert on native)
-  - **PR detection:** `checkAndMarkPR(setId)` called on every set check-off. Uses Epley 1RM (`weight × (1 + reps/30)`) for fair cross-rep-range comparison. Marks `isPersonalRecord: true` on the set and updates `allTimeBest` if beaten. Trophy icon replaces set number in the table for PR sets
-- **Workout summary modal:** shown immediately after confirming Finish. Header: name, date/time, duration, total volume, PR count with trophy. Per-exercise: best estimated 1RM. Per-set: weight × reps, 1RM value, trophy + amber text for PRs. Closing navigates back to workout tab
+  - **PR detection:** `checkAndMarkPR(setId)` called on every set check-off. Uses Epley 1RM (`weight × (1 + reps/30)`). Trophy icon on PR sets
+  - **Short workout modal:** finishing before 5 minutes shows a custom modal (not a system alert) with three buttons: Finish Workout, Cancel Workout, Keep Going. Tapping outside dismisses (Keep Going)
+  - **Cancel vs Finish separation:** `cancelSession()` clears state without adding to history; `endSession()` saves to `completedWorkouts`. Only finished workouts appear in history
+- **Workout summary modal:**
+  - Shown immediately after confirming Finish
+  - Displays workout-level notes and per-exercise notes (with document icon)
+  - Tap outside the sheet to dismiss (no need to press X)
+  - **Post-workout template actions:** template workouts show "Update Template" button (updates exercise list, targetSets = max(old, actual), rest times); ad-hoc workouts show "Save as Template" with inline name input
 - Resume banner on Workout tab when session is active
 - Starting from template pre-populates exercises with configured rest times
 - **Exercise management (exercises screen):**
   - **Create exercise:** "+" button in header opens bottom-sheet modal (name, muscle group chips, equipment chips, optional instructions). Saved to `customExercises` in Zustand, immediately visible in list with purple "Custom" badge
   - **Search-to-create:** when search returns no results, a "Create '[search term]'" prompt appears with the name pre-filled in the modal
   - **Edit custom exercise:** pencil icon on each custom exercise row opens the same modal pre-filled. Saves via `updateCustomExercise`. Built-in exercises have no edit button
-  - Edit and select icons have `gap: spacing.lg` + `padding + hitSlop: 12` to prevent mis-taps
-  - Custom exercises appear in the lookup inside the active workout (fix: `allExercises` built from `[...builtInExercises, ...customExercises]` inside the component and passed as a prop — static module-level lookup was causing "Unknown" display)
+  - Custom exercises appear in the lookup inside the active workout
 - 40 pre-built exercises across all muscle groups
+
+### Zustand Persistence (complete)
+- `@react-native-async-storage/async-storage` installed
+- `workoutStore` wrapped with `persist` middleware. Persisted fields: `templates`, `customExercises`, `completedWorkouts`, `exerciseHistory`, `allTimeBest`, `pinnedNotes`, `sessionNotes`, `activeSession`, `activeExercises`, `activeSets`, rest timer fields
+- `lastCompletedWorkout` is NOT persisted — cleared by `startSession()` to prevent stale summary showing on new workout
+- On web, AsyncStorage uses `localStorage`; on native, device async storage
+
+### Workout History (complete)
+- `app/workout/history.tsx` fully wired — merges `completedWorkouts` (strength) and `workoutRecords` (cardio/Garmin) into one list, sorted newest first
+- Strength cards: duration, volume, exercise count (only exercises with ≥1 completed set), PRs. Tap to open full `WorkoutSummaryModal`
+- Cardio cards: duration, distance, kcal, avg HR, source pill (Garmin etc.)
+- Run workouts use `MaterialIcons directions-run` icon; other types use Ionicons
+- **3-dot menu per card:** Edit Name (rename modal), Save as Template (strength only), Delete (with confirmation)
+- Tapping the card summary closes when tapping outside
+
+### Activity Tab Enhancements (complete)
+- Active Minutes now sums `todayActivity.activeMinutes` + duration of all today's `workoutRecords`
+- Breakdown line shown when both contribute (e.g. "42 activity + 38 workouts")
+- "Today's Workouts" card appears when workouts exist for today: icon, name, distance, kcal, avg HR, source badge
+- `workoutRecords` in `healthStore`: `setWorkoutRecords`, `addWorkoutRecord`, `deleteWorkoutRecord`, `renameWorkoutRecord`
+- 4 mock workout records seeded for web dev (morning run today, strength 2d ago, ride 3d ago, easy run 5d ago)
 
 ---
 
@@ -105,6 +133,12 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | Workout summary modal never appeared after Finish | **Root cause:** Zustand `set()` is synchronous — `activeSession` became `null` before React's `setSummaryWorkout()` could apply, hitting the `if (!activeSession)` early return. **Fix:** moved `lastCompletedWorkout` into Zustand so `endSession` sets `activeSession: null` and `lastCompletedWorkout: completed` atomically in one `set()`. Component reads from store — both values ready on the same render |
 | PR flag overwritten to `false` on finish | **Root cause:** `endSession` re-ran Epley detection against `allTimeBest` already updated by `checkAndMarkPR`. `96 > 96 = false` cleared the flag. **Fix:** `endSession` no longer re-runs detection — it trusts `isPersonalRecord` already set by `checkAndMarkPR`. Only `checkAndMarkPR` mutates `allTimeBest` |
 | PR detection only compared weight×reps volume | Replaced with Epley 1RM (`weight × (1 + reps/30)`) so strength improvements are detected fairly across rep ranges |
+| Completed sets unchecked after app refresh | `SetRow` initialised `completed` state as hardcoded `false`; fixed by initialising from `set.completedAt !== ''` |
+| Unchecking a set didn't persist | Unchecking only cleared local state; fixed by writing `completedAt: ''` back to the store |
+| Summary modal fires immediately on new workout | `lastCompletedWorkout` lingered in store from previous session; fixed by clearing it in `startSession()` |
+| Cancelled workouts appeared in history | `handleCancelWorkout` was calling `endSession()` which saves to history; fixed by adding separate `cancelSession()` that clears state without saving |
+| Summary modal required X button to close | Overlay `View` swapped to `Pressable` with `onPress={onClose}`; inner card uses `stopPropagation()` |
+| Workout history exercise count included template exercises | Filtered to only count exercises with `sets.some(s => s.completedAt !== '')` |
 
 ---
 
@@ -129,16 +163,16 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | `app/(tabs)/_layout.tsx` | Bottom tab navigator (5 tabs) |
 | `app/(tabs)/dashboard.tsx` | Main metric grid with greeting, settings gear (top right), Recovery, Sleep, Steps, HR, HRV, Readiness, Stress, Active Min, Calories |
 | `app/(tabs)/sleep.tsx` | 5-factor sleep score breakdown + stages + 7-day history |
-| `app/(tabs)/activity.tsx` | Steps, Active Minutes, Calories, Distance + 7-day history |
+| `app/(tabs)/activity.tsx` | Steps, Active Minutes (includes workout durations), Calories, Distance + 7-day history + Today's Workouts card |
 | `app/(tabs)/heart.tsx` | Resting HR, HRV, Readiness, Stress + 7-day histories |
 | `app/(tabs)/workout.tsx` | Workout home: start empty, resume active, templates (tap for preview modal), history link. Seed templates loaded here on first mount via `useEffect` |
 | `app/settings/_layout.tsx` | Settings stack layout |
 | `app/settings/index.tsx` | Data source connections, goals, preferences (back arrow top left) |
 | `app/workout/_layout.tsx` | Workout stack layout |
-| `app/workout/active.tsx` | Active workout session. Receives `allExercises` built from builtIn + custom for exercise name lookup. 3-dot menu includes Replace Exercise |
+| `app/workout/active.tsx` | Active workout session. Editable name + notes (inline TextInput). 3-dot menu: Edit Name, Add Notes. Short workout modal (<5 min). `cancelSession()` vs `endSession()` separation |
 | `app/workout/exercises.tsx` | Exercise picker. Modes: `pick` (multi-select), `replace` (single-tap). Has create modal (reused for edit), search-to-create empty state, pencil edit button on custom exercises |
 | `app/workout/template.tsx` | Template editor (create/edit, add exercises, sets/rest config with +/-15s stepper) |
-| `app/workout/history.tsx` | Workout history (empty state, ready for data) |
+| `app/workout/history.tsx` | Workout history — merged strength + cardio list, 3-dot menu (rename/save-as-template/delete), tap card to open WorkoutSummaryModal |
 
 ### Components (`src/components/`)
 | File | Purpose |
@@ -149,13 +183,13 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | `src/components/cards/MetricCard.tsx` | Reusable metric card (icon, value, progress, trend, source) |
 | `src/components/cards/RecoveryCard.tsx` | Full-width recovery score card |
 | `src/components/workout/TemplatePreviewModal.tsx` | Centered modal showing template overview + start/edit |
-| `src/components/workout/WorkoutSummaryModal.tsx` | Post-workout summary modal: duration, volume, PR count, per-exercise sets with Epley 1RM, trophy icons on PR sets |
+| `src/components/workout/WorkoutSummaryModal.tsx` | Post-workout summary modal: duration, volume, PR count, workout + exercise notes, Epley 1RM, trophy icons. Tap outside to close. Optional `onUpdateTemplate` / `onSaveAsTemplate` callbacks show template action footer |
 
 ### State Management (`src/stores/`)
 | File | Purpose |
 |------|---------|
-| `src/stores/healthStore.ts` | Today's health metrics + history arrays (auto-loads mock on web) |
-| `src/stores/workoutStore.ts` | Active session, exercises, sets, templates, `customExercises`, rest timer, pinned notes, exercise history (pre-seeded for 10 exercises), `allTimeBest` (Epley 1RM per exercise), `completedWorkouts`, `lastCompletedWorkout`. Actions: `checkAndMarkPR`, `endSession` (atomic — sets `lastCompletedWorkout` in same call as `activeSession: null`), `clearLastCompletedWorkout`, `addCustomExercise`, `updateCustomExercise`, `replaceExerciseInSession` |
+| `src/stores/healthStore.ts` | Today's health metrics + history arrays + `workoutRecords` (auto-loads mock on web). Actions: `setWorkoutRecords`, `addWorkoutRecord`, `deleteWorkoutRecord`, `renameWorkoutRecord` |
+| `src/stores/workoutStore.ts` | Active session, exercises, sets, templates, `customExercises`, rest timer, pinned notes, `sessionNotes`, exercise history, `allTimeBest`, `completedWorkouts`, `lastCompletedWorkout`. **Persisted via AsyncStorage.** Actions: `endSession` (saves to history), `cancelSession` (discards — no history entry), `setSessionName`, `setSessionNotes`, `saveAsTemplate`, `updateTemplateFromWorkout`, `deleteCompletedWorkout`, `renameCompletedWorkout` |
 | `src/stores/exercisePickerStore.ts` | Temporary selection state + `replaceTargetId` for replace flow |
 | `src/stores/settingsStore.ts` | Connection states, goals, unit preferences |
 
@@ -201,17 +235,17 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 ```typescript
 interface WorkoutState {
   activeSession: WorkoutSession | null;
+  sessionNotes: string;                    // workout-level notes, persisted, saved into CompletedWorkout on finish
   activeExercises: ActiveExercise[];       // exerciseId, notes, notesPinned, restSeconds
   activeSets: WorkoutSet[];
   templates: WorkoutTemplate[];
-  customExercises: Exercise[];             // user-created, persists in Zustand
+  customExercises: Exercise[];             // user-created, persisted
+  completedWorkouts: CompletedWorkout[];   // persisted
+  lastCompletedWorkout: CompletedWorkout | null; // NOT persisted — cleared by startSession()
   pinnedNotes: Record<string, string>;     // exerciseId -> persistent note
-  exerciseHistory: Record<string, {        // exerciseId -> last session's sets (pre-seeded for 10 exercises)
-    weight: number | null;
-    reps: number | null;
-    type: SetType;
-  }[]>;
-  restTimerEnd: number | null;
+  exerciseHistory: Record<string, { weight: number | null; reps: number | null; type: SetType }[]>;
+  allTimeBest: Record<string, number>;     // exerciseId -> best Epley 1RM ever
+  restTimerEnd: number | null;             // absolute epoch ms, persisted
   restTimerDuration: number;
   restTimerPaused: boolean;
   restTimerPausedRemaining: number | null;
@@ -220,12 +254,15 @@ interface WorkoutState {
 ```
 
 Key behaviors:
-- `endSession()` saves completed sets into `exerciseHistory` before clearing active state
+- `endSession()` saves to `completedWorkouts` + `exerciseHistory`, clears active state. `CompletedWorkout` includes `notes`, and per-exercise `notes` + `restSeconds`
+- `cancelSession()` clears active state without touching `completedWorkouts` — cancelled workouts never appear in history
+- `startSession()` clears `lastCompletedWorkout` to prevent stale summary modal on new workout
 - `addExerciseToSession()` loads pinned notes and creates sets from history (or 1 empty set)
 - `replaceExerciseInSession()` swaps exercise in-place, loads new exercise's history, preserves rest time
 - `insertSetAtBeginning()` places warmup sets after existing warmups but before working sets
-- `toggleExerciseNotePin()` toggles between session-only and persistent notes
-- `addCustomExercise()` / `updateCustomExercise()` manage user-created exercises
+- `saveAsTemplate(name, workout)` creates a new template from a completed workout
+- `updateTemplateFromWorkout(templateId, workout)` updates exercise list + `targetSets = max(old, actual)`
+- `deleteCompletedWorkout(id)` / `renameCompletedWorkout(id, name)` for history management
 - Working set numbers computed dynamically at render time (not stored)
 
 ---
@@ -234,15 +271,11 @@ Key behaviors:
 
 ### Immediate (Phase 3 completion)
 
-1. **Populate workout history screen** — `completedWorkouts` is already in the store. Wire `app/workout/history.tsx` to list them: date, duration, total volume, exercise count. Tap to expand (can reuse `WorkoutSummaryModal` or a similar read-only layout).
+1. **Pre-populate sets from template** — When starting from a template, create `max(template.targetSets, historySetCount)` set rows per exercise. Currently only history count is used (defaults to 1 if no history). Logic goes in `startSession` or `addExerciseToSession`.
 
-2. **Pre-populate sets from template** — When starting from a template, create `max(template.targetSets, historySetCount)` set rows per exercise. Currently only history count is used (defaults to 1 if no history).
+2. **Expand exercise library** — Go from 40 to 200+ exercises in `src/data/exercises.json`.
 
-3. **Expand exercise library** — Go from 40 to 200+ exercises in `src/data/exercises.json`.
-
-4. **Superset support** — Allow grouping exercises in the template editor and active workout (shared rest timer between superset exercises).
-
-5. **Zustand persistence** — Add `zustand/middleware` persist with AsyncStorage so `pinnedNotes`, `exerciseHistory`, `allTimeBest`, `templates`, `customExercises`, and `completedWorkouts` survive app restarts. Currently everything resets on page refresh — this is the most impactful remaining item.
+3. **Superset support** — Allow grouping exercises in the template editor and active workout (shared rest timer between superset exercises). `supersetGroup` field already exists on `TemplateExercise` but is not wired.
 
 ### Phase 2: Garmin API Integration
 
@@ -324,3 +357,9 @@ npx expo install --fix
 | Weight unit: kg | Stored in settings store |
 | SQLite via op-sqlite | Fast, offline-first, works with Expo dev client |
 | No Apple Developer account yet | All development via web preview; native build deferred |
+| `cancelSession` vs `endSession` | Two separate actions — cancel discards without saving to history; finish saves. Previously both called `endSession` which caused cancelled workouts to appear in history |
+| `lastCompletedWorkout` not persisted | Cleared in `startSession()` to prevent the previous workout's summary modal from auto-showing when a new workout starts |
+| Zustand persist `partialize` | Only meaningful state is persisted — `lastCompletedWorkout` excluded; active session fields included so in-progress workouts survive crashes |
+| `hasHydrated()` guard on seed templates | Seed fires only after persist middleware hydrates; prevents overwriting user's saved templates on first render |
+| Workout notes stored separately as `sessionNotes` | Easier to target with `partialize` than nesting inside `activeSession`; cleared atomically with `endSession`/`cancelSession` |
+| History exercise count uses completed sets filter | `w.exercises.filter(e => e.sets.some(s => s.completedAt !== ''))` — counts only exercises with ≥1 logged set, not all template exercises |

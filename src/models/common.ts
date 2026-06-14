@@ -1,4 +1,4 @@
-export type DataSource = 'garmin' | 'apple_health' | 'fitbit';
+export type DataSource = 'garmin' | 'apple_health' | 'fitbit' | 'combined';
 
 export interface MetricRecord {
   id: string;

@@ -68,11 +68,14 @@ export type SetType = 'working' | 'warmup' | 'dropset' | 'failure';
 export interface CompletedWorkoutExercise {
   exerciseId: string;
   sets: WorkoutSet[];
+  restSeconds: number;
+  notes: string;
 }
 
 export interface CompletedWorkout {
   id: string;
   name: string;
+  notes: string;
   templateId: string | null;
   startTime: string;
   endTime: string;

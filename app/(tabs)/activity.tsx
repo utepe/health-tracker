@@ -9,9 +9,43 @@ import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
 import { Ionicons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { WorkoutType } from '../../src/models/activity';
+
+const IONICONS_ICONS: Partial<Record<WorkoutType, keyof typeof Ionicons.glyphMap>> = {
+  cycle: 'bicycle-outline',
+  swim: 'water-outline',
+  walk: 'footsteps-outline',
+  hike: 'trail-sign-outline',
+  strength: 'barbell-outline',
+  yoga: 'body-outline',
+  cardio: 'heart-outline',
+  other: 'fitness-outline',
+};
+
+function WorkoutIcon({ type, color }: { type: WorkoutType; color: string }) {
+  if (type === 'run') return <MaterialIcons name="directions-run" size={18} color={color} />;
+  return <Ionicons name={IONICONS_ICONS[type] ?? 'fitness-outline'} size={18} color={color} />;
+}
+
+const WORKOUT_COLORS: Record<WorkoutType, string> = {
+  run: colors.activity,
+  cycle: colors.info,
+  swim: '#60D5FA',
+  walk: colors.steps,
+  hike: '#A3E635',
+  strength: colors.stress,
+  yoga: colors.sleep,
+  cardio: colors.heart,
+  other: colors.textSecondary,
+};
 
 export default function ActivityScreen() {
-  const { todayActivity, activityHistory } = useHealthStore();
+  const { todayActivity, activityHistory, workoutRecords } = useHealthStore();
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const todayWorkouts = workoutRecords.filter((w) => w.date === today);
+  const workoutActiveMinutes = todayWorkouts.reduce((sum, w) => sum + w.durationMinutes, 0);
+  const totalActiveMinutes = (todayActivity?.activeMinutes ?? 0) + workoutActiveMinutes;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -52,19 +86,60 @@ export default function ActivityScreen() {
             {todayActivity && <SourceBadge source={todayActivity.source} />}
           </View>
           <Text style={styles.metricValue}>
-            {todayActivity?.activeMinutes ?? '--'}
+            {todayActivity || todayWorkouts.length > 0 ? totalActiveMinutes : '--'}
             <Text style={styles.metricUnit}> min</Text>
           </Text>
+          {workoutActiveMinutes > 0 && todayActivity && (
+            <Text style={styles.activeBreakdown}>
+              {todayActivity.activeMinutes} activity + {workoutActiveMinutes} workouts
+            </Text>
+          )}
           <View style={styles.goalRow}>
             <View style={styles.goalBar}>
               <ProgressBar
-                progress={todayActivity ? todayActivity.activeMinutes / 30 : 0}
+                progress={totalActiveMinutes / 30}
                 color={colors.activity}
               />
             </View>
             <Text style={styles.goalText}>/ 30 min</Text>
           </View>
         </Card>
+
+        {/* Today's Workouts */}
+        {todayWorkouts.length > 0 && (
+          <Card>
+            <Text style={styles.sectionTitle}>Today's Workouts</Text>
+            <View style={styles.workoutList}>
+              {todayWorkouts.map((w, idx) => (
+                <View key={w.id}>
+                  {idx > 0 && <View style={styles.workoutDivider} />}
+                  <View style={styles.workoutRow}>
+                    <View style={[styles.workoutIconWrap, { backgroundColor: WORKOUT_COLORS[w.activityType] + '20' }]}>
+                      <WorkoutIcon type={w.activityType} color={WORKOUT_COLORS[w.activityType]} />
+                    </View>
+                    <View style={styles.workoutInfo}>
+                      <Text style={styles.workoutName}>{w.name}</Text>
+                      <Text style={styles.workoutMeta}>
+                        {w.durationMinutes} min
+                        {w.distanceMeters ? `  ·  ${(w.distanceMeters / 1000).toFixed(1)} km` : ''}
+                        {w.caloriesBurned ? `  ·  ${w.caloriesBurned} kcal` : ''}
+                      </Text>
+                    </View>
+                    <View style={styles.workoutRight}>
+                      {w.avgHeartRate && (
+                        <View style={styles.workoutHR}>
+                          <Ionicons name="heart" size={11} color={colors.heart} />
+                          <Text style={styles.workoutHRText}>{w.avgHeartRate}</Text>
+                        </View>
+                      )}
+                      <SourceBadge source={w.source} />
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Card>
+        )}
 
         {/* Calories */}
         <Card>
@@ -291,5 +366,57 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textTertiary,
     marginTop: 2,
+  },
+  activeBreakdown: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginBottom: spacing.sm,
+  },
+  workoutList: {
+    gap: 0,
+  },
+  workoutDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
+  },
+  workoutRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  workoutIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workoutInfo: {
+    flex: 1,
+  },
+  workoutName: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
+  workoutMeta: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    marginTop: 2,
+  },
+  workoutRight: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  workoutHR: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  workoutHRText: {
+    ...typography.caption,
+    color: colors.heart,
+    fontWeight: '600',
   },
 });

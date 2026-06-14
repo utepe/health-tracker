@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { SleepRecord } from '../models/sleep';
-import { DailyActivity } from '../models/activity';
+import { DailyActivity, WorkoutRecord } from '../models/activity';
 import { DailyHeartMetrics } from '../models/heart';
 import { DailyRecovery } from '../models/recovery';
-import { mockSleep, mockActivity, mockHeart, mockRecovery, weeklyMockData } from '../data/mockData';
+import { mockSleep, mockActivity, mockHeart, mockRecovery, mockWorkoutRecords, weeklyMockData } from '../data/mockData';
 import { Platform } from 'react-native';
 
 // Use mock data on web for development
@@ -17,6 +17,7 @@ interface HealthState {
   sleepHistory: SleepRecord[];
   activityHistory: DailyActivity[];
   heartHistory: DailyHeartMetrics[];
+  workoutRecords: WorkoutRecord[];
   isLoading: boolean;
   lastSyncTime: string | null;
 
@@ -27,6 +28,10 @@ interface HealthState {
   setSleepHistory: (history: SleepRecord[]) => void;
   setActivityHistory: (history: DailyActivity[]) => void;
   setHeartHistory: (history: DailyHeartMetrics[]) => void;
+  setWorkoutRecords: (records: WorkoutRecord[]) => void;
+  addWorkoutRecord: (record: WorkoutRecord) => void;
+  deleteWorkoutRecord: (id: string) => void;
+  renameWorkoutRecord: (id: string, name: string) => void;
   setIsLoading: (loading: boolean) => void;
   setLastSyncTime: (time: string) => void;
 }
@@ -39,6 +44,7 @@ export const useHealthStore = create<HealthState>((set) => ({
   sleepHistory: useMock ? weeklyMockData.sleepHistory : [],
   activityHistory: useMock ? weeklyMockData.activityHistory : [],
   heartHistory: useMock ? weeklyMockData.heartHistory : [],
+  workoutRecords: useMock ? mockWorkoutRecords : [],
   isLoading: false,
   lastSyncTime: useMock ? new Date().toISOString() : null,
 
@@ -49,6 +55,12 @@ export const useHealthStore = create<HealthState>((set) => ({
   setSleepHistory: (history) => set({ sleepHistory: history }),
   setActivityHistory: (history) => set({ activityHistory: history }),
   setHeartHistory: (history) => set({ heartHistory: history }),
+  setWorkoutRecords: (records) => set({ workoutRecords: records }),
+  addWorkoutRecord: (record) => set((state) => ({ workoutRecords: [record, ...state.workoutRecords] })),
+  deleteWorkoutRecord: (id) => set((state) => ({ workoutRecords: state.workoutRecords.filter((r) => r.id !== id) })),
+  renameWorkoutRecord: (id, name) => set((state) => ({
+    workoutRecords: state.workoutRecords.map((r) => r.id === id ? { ...r, name } : r),
+  })),
   setIsLoading: (loading) => set({ isLoading: loading }),
   setLastSyncTime: (time) => set({ lastSyncTime: time }),
 }));

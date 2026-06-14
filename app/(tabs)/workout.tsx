@@ -57,12 +57,13 @@ export default function WorkoutScreen() {
   const router = useRouter();
   const { templates, activeSession, startSession, addExerciseToSession, setTemplates } = useWorkoutStore();
   const [previewTemplate, setPreviewTemplate] = useState<WorkoutTemplate | null>(null);
+  const hasHydrated = useWorkoutStore.persist.hasHydrated();
 
   useEffect(() => {
-    if (templates.length === 0) {
+    if (hasHydrated && templates.length === 0) {
       setTemplates(SEED_TEMPLATES);
     }
-  }, []);
+  }, [hasHydrated]);
 
   const handleStartEmpty = () => {
     const session: WorkoutSession = {

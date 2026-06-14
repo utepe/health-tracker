@@ -1,4 +1,5 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -39,12 +40,19 @@ export function WorkoutSummaryModal({
   workout,
   allExercises,
   onClose,
+  onSaveAsTemplate,
+  onUpdateTemplate,
 }: {
   visible: boolean;
   workout: CompletedWorkout | null;
   allExercises: Exercise[];
   onClose: () => void;
+  onSaveAsTemplate?: (name: string) => void;
+  onUpdateTemplate?: () => void;
 }) {
+  const [templateName, setTemplateName] = useState('');
+  const [showNameInput, setShowNameInput] = useState(false);
+
   if (!workout) return null;
 
   const getExercise = (id: string) => allExercises.find((e) => e.id === id);
@@ -55,8 +63,8 @@ export function WorkoutSummaryModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable style={styles.card} onPress={(e) => e.stopPropagation()}>
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={onClose} style={styles.closeButton}>
@@ -68,6 +76,14 @@ export function WorkoutSummaryModal({
 
           {/* Date */}
           <Text style={styles.dateText}>{formatDate(workout.startTime)}</Text>
+
+          {/* Workout notes */}
+          {!!workout.notes && (
+            <View style={styles.workoutNotesWrap}>
+              <Ionicons name="document-text-outline" size={13} color={colors.textTertiary} style={styles.noteIcon} />
+              <Text style={styles.workoutNotesText}>{workout.notes}</Text>
+            </View>
+          )}
 
           {/* Stats row */}
           <View style={styles.statsRow}>
@@ -91,9 +107,52 @@ export function WorkoutSummaryModal({
 
           <View style={styles.divider} />
 
+          {/* Template action footer — shown only when called from the active workout */}
+          {(onSaveAsTemplate || onUpdateTemplate) && (
+            <View style={styles.templateFooter}>
+              {onUpdateTemplate && (
+                <Pressable style={styles.templateButton} onPress={() => { onUpdateTemplate(); onClose(); }}>
+                  <Ionicons name="refresh-outline" size={16} color={colors.textPrimary} />
+                  <Text style={styles.templateButtonText}>Update Template</Text>
+                </Pressable>
+              )}
+              {onSaveAsTemplate && !showNameInput && (
+                <Pressable style={styles.templateButton} onPress={() => {
+                  setTemplateName(workout.name);
+                  setShowNameInput(true);
+                }}>
+                  <Ionicons name="bookmark-outline" size={16} color={colors.textPrimary} />
+                  <Text style={styles.templateButtonText}>Save as Template</Text>
+                </Pressable>
+              )}
+              {onSaveAsTemplate && showNameInput && (
+                <View style={styles.nameInputRow}>
+                  <TextInput
+                    style={styles.nameInput}
+                    value={templateName}
+                    onChangeText={setTemplateName}
+                    placeholder="Template name"
+                    placeholderTextColor={colors.textTertiary}
+                    autoFocus
+                  />
+                  <Pressable
+                    style={[styles.saveConfirmButton, !templateName.trim() && styles.saveConfirmDisabled]}
+                    onPress={() => {
+                      if (!templateName.trim()) return;
+                      onSaveAsTemplate(templateName.trim());
+                      onClose();
+                    }}
+                  >
+                    <Text style={styles.saveConfirmText}>Save</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Exercise list */}
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {workout.exercises.map(({ exerciseId, sets }) => {
+            {workout.exercises.map(({ exerciseId, sets, notes: exerciseNotes }) => {
               const exercise = getExercise(exerciseId);
               const completedSets = sets.filter((s) => s.completedAt !== '');
               if (completedSets.length === 0) return null;
@@ -116,6 +175,12 @@ export function WorkoutSummaryModal({
                       <Text style={styles.oneRMLabel}>{best1RM} kg</Text>
                     )}
                   </View>
+                  {!!exerciseNotes && (
+                    <View style={styles.exerciseNotesWrap}>
+                      <Ionicons name="document-text-outline" size={12} color={colors.textTertiary} style={styles.noteIcon} />
+                      <Text style={styles.exerciseNotesText}>{exerciseNotes}</Text>
+                    </View>
+                  )}
 
                   {completedSets.map((s) => {
                     const isWorking = s.type === 'working';
@@ -146,8 +211,8 @@ export function WorkoutSummaryModal({
             })}
             <View style={{ height: spacing.xxxl }} />
           </ScrollView>
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
@@ -270,5 +335,90 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     minWidth: 32,
     textAlign: 'right',
+  },
+  workoutNotesWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  noteIcon: {
+    marginTop: 2,
+  },
+  workoutNotesText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    flex: 1,
+    lineHeight: 18,
+  },
+  exerciseNotesWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  exerciseNotesText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    flex: 1,
+    lineHeight: 17,
+    fontStyle: 'italic',
+  },
+  templateFooter: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  templateButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 8,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  templateButtonText: {
+    ...typography.body,
+    color: colors.textPrimary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  nameInputRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  nameInput: {
+    flex: 1,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    ...typography.body,
+    color: colors.textPrimary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  saveConfirmButton: {
+    backgroundColor: colors.activity,
+    borderRadius: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  saveConfirmDisabled: {
+    opacity: 0.4,
+  },
+  saveConfirmText: {
+    ...typography.body,
+    color: '#000',
+    fontWeight: '700',
   },
 });
