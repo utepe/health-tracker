@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -66,6 +66,9 @@ export default function ActiveWorkoutScreen() {
   } = useWorkoutStore();
 
   const { selectedIds, clear: clearPicker, replaceTargetId, clearReplaceTarget } = useExercisePickerStore();
+  const { width: screenWidth } = useWindowDimensions();
+  // Scale factor: 1.0 at 390px (iPhone 14), grows on wider screens, capped at 1.6 for desktop
+  const scale = Math.min(1.6, Math.max(1.0, screenWidth / 390));
   const [elapsed, setElapsed] = useState(0);
   const [restRemaining, setRestRemaining] = useState(0);
   const [inlineTimerVisible, setInlineTimerVisible] = useState(true);
@@ -343,6 +346,7 @@ export default function ActiveWorkoutScreen() {
               checkAndMarkPR(setId);
               startRestTimer(activeExercise.restSeconds, setId);
             }}
+            scale={scale}
           />
         ))}
 
@@ -431,6 +435,7 @@ function ExerciseBlock({
   onRemoveExercise,
   onReplaceExercise,
   onStartRest,
+  scale,
 }: {
   activeExercise: ActiveExercise;
   allExercises: Exercise[];
@@ -459,6 +464,7 @@ function ExerciseBlock({
   onRemoveExercise: () => void;
   onReplaceExercise: () => void;
   onStartRest: (setId: string) => void;
+  scale: number;
 }) {
   const [showNotes, setShowNotes] = useState(activeExercise.notes.length > 0 || activeExercise.notesPinned);
   const [showMenu, setShowMenu] = useState(false);
@@ -615,13 +621,21 @@ function ExerciseBlock({
       )}
 
       {/* Set Table Header */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableHeaderText, styles.colSet]}>SET</Text>
-        <Text style={[styles.tableHeaderText, styles.colPrev]}>PREVIOUS</Text>
-        <Text style={[styles.tableHeaderText, styles.colWeight]}>KG</Text>
-        <Text style={[styles.tableHeaderText, styles.colReps]}>REPS</Text>
-        <View style={styles.colCheck} />
-      </View>
+      {(() => {
+        const hColSet = Math.round(32 * scale);
+        const hColWeight = Math.round(64 * scale);
+        const hColReps = Math.round(56 * scale);
+        const hColCheck = Math.round(36 * scale);
+        return (
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableHeaderText, styles.colSet, { width: hColSet }]}>SET</Text>
+            <Text style={[styles.tableHeaderText, styles.colPrev]}>PREVIOUS</Text>
+            <Text style={[styles.tableHeaderText, styles.colWeight, { width: hColWeight }]}>KG</Text>
+            <Text style={[styles.tableHeaderText, styles.colReps, { width: hColReps }]}>REPS</Text>
+            <View style={[styles.colCheck, { width: hColCheck }]} />
+          </View>
+        );
+      })()}
 
       {/* Set Rows with rest time after each set */}
       {sets.map((set, index) => {
@@ -644,6 +658,7 @@ function ExerciseBlock({
               onUpdate={(updates) => onUpdateSet(set.id, updates)}
               onRemove={() => onRemoveSet(set.id)}
               onComplete={() => onStartRest(set.id)}
+              scale={scale}
             />
             {/* Rest: active timer OR static label */}
             {isTimerForThisSet ? (
@@ -660,7 +675,7 @@ function ExerciseBlock({
                 </View>
                 <View style={styles.inlineRestControls}>
                   {/* Left buttons */}
-                  <View style={styles.inlineRestSide}>
+                  <View style={[styles.inlineRestSide, { justifyContent: 'flex-end' }]}>
                     <Pressable onPress={() => onAdjustRest(-10)} style={styles.inlineRestBtn}>
                       <Text style={styles.inlineRestBtnText}>-10s</Text>
                     </Pressable>
@@ -672,19 +687,20 @@ function ExerciseBlock({
                   <Text style={styles.inlineRestTime}>
                     {formatDuration(restTimerPaused ? (restTimerPausedRemaining ?? 0) : restRemaining)}
                   </Text>
-                  {/* Right buttons */}
-                  <View style={styles.inlineRestSide}>
+                  {/* Right buttons — mirror left side for symmetric layout */}
+                  <View style={[styles.inlineRestSide, { justifyContent: 'flex-start' }]}>
                     <Pressable onPress={onResetRest} style={styles.inlineRestBtn}>
                       <Ionicons name="refresh" size={14} color={colors.textSecondary} />
                     </Pressable>
                     <Pressable onPress={() => onAdjustRest(10)} style={styles.inlineRestBtn}>
                       <Text style={styles.inlineRestBtnText}>+10s</Text>
                     </Pressable>
-                    <Pressable onPress={onSkipRest} style={styles.inlineRestSkipBtn}>
-                      <Text style={styles.inlineRestSkipText}>Skip</Text>
-                    </Pressable>
                   </View>
                 </View>
+                {/* Skip on its own centered row so it doesn't break symmetry */}
+                <Pressable onPress={onSkipRest} style={styles.inlineRestSkipRow}>
+                  <Text style={styles.inlineRestSkipText}>Skip</Text>
+                </Pressable>
               </View>
             ) : (
               <View style={styles.restIndicator}>
@@ -716,6 +732,7 @@ function SetRow({
   onUpdate,
   onRemove,
   onComplete,
+  scale,
 }: {
   set: WorkoutSet;
   workingSetNumber: number;
@@ -723,6 +740,7 @@ function SetRow({
   onUpdate: (updates: Partial<WorkoutSet>) => void;
   onRemove: () => void;
   onComplete: () => void;
+  scale: number;
 }) {
   const [weight, setWeight] = useState(set.weight?.toString() ?? '');
   const [reps, setReps] = useState(set.reps?.toString() ?? '');
@@ -765,11 +783,18 @@ function SetRow({
 
   const allTypes: SetType[] = ['working', 'warmup', 'dropset', 'failure'];
 
+  const colSetW = Math.round(32 * scale);
+  const colWeightW = Math.round(64 * scale);
+  const colRepsW = Math.round(56 * scale);
+  const colCheckW = Math.round(36 * scale);
+  const inputFontSize = Math.round(15 * scale);
+  const prevFontSize = Math.round(14 * scale);
+
   return (
     <View>
       <View style={[styles.setRow, completed && styles.setRowCompleted]}>
         {/* Set number / type */}
-        <Pressable onPress={() => setShowTypePicker(!showTypePicker)} style={styles.colSet}>
+        <Pressable onPress={() => setShowTypePicker(!showTypePicker)} style={[styles.colSet, { width: colSetW }]}>
           {set.isPersonalRecord ? (
             <Ionicons name="trophy" size={14} color={colors.warning} />
           ) : (
@@ -780,11 +805,11 @@ function SetRow({
         </Pressable>
 
       {/* Previous */}
-      <Text style={[styles.prevText, styles.colPrev]}>{previousText}</Text>
+      <Text style={[styles.prevText, styles.colPrev, { fontSize: prevFontSize }]} numberOfLines={1}>{previousText}</Text>
 
       {/* Weight Input */}
       <TextInput
-        style={[styles.setInput, styles.colWeight, completed && styles.setInputCompleted]}
+        style={[styles.setInput, styles.colWeight, { width: colWeightW, fontSize: inputFontSize }, completed && styles.setInputCompleted]}
         value={weight}
         onChangeText={setWeight}
         keyboardType="decimal-pad"
@@ -794,7 +819,7 @@ function SetRow({
 
       {/* Reps Input */}
       <TextInput
-        style={[styles.setInput, styles.colReps, completed && styles.setInputCompleted]}
+        style={[styles.setInput, styles.colReps, { width: colRepsW, fontSize: inputFontSize }, completed && styles.setInputCompleted]}
         value={reps}
         onChangeText={setReps}
         keyboardType="number-pad"
@@ -804,7 +829,7 @@ function SetRow({
 
       {/* Checkmark */}
       <Pressable
-        style={[styles.checkButton, completed && styles.checkButtonDone]}
+        style={[styles.checkButton, completed && styles.checkButtonDone, { width: colCheckW, height: colCheckW, borderRadius: Math.round(colCheckW / 2) }]}
         onPress={handleCheck}
       >
         <Ionicons
@@ -952,7 +977,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
   },
   // Workout Header
   workoutHeader: {
@@ -997,7 +1022,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     backgroundColor: colors.surface,
     borderRadius: 12,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
   exerciseHeader: {
     marginBottom: spacing.sm,
@@ -1156,7 +1182,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.md,
   },
   inlineRestBtn: {
@@ -1189,10 +1214,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.activity,
     minWidth: 36,
   },
+  inlineRestSkipRow: {
+    alignSelf: 'center',
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: colors.activity,
+  },
   inlineRestSkipText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.background,
+    textAlign: 'center',
   },
   // Table
   tableHeader: {
@@ -1211,26 +1245,29 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  // Column widths
+  // Column widths — must fit on a 375px iPhone screen
+  // SET(32) + PREV(flex1.2) + KG(flex1) + REPS(flex1) + CHECK(36) + margins ≈ fits
   colSet: {
-    width: 36,
+    width: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
   colPrev: {
-    width: 80,
+    flex: 1,
     textAlign: 'center',
+    paddingHorizontal: 4,
   },
   colWeight: {
-    flex: 1,
+    width: 64,
     marginHorizontal: 4,
   },
   colReps: {
-    flex: 1,
+    width: 56,
     marginHorizontal: 4,
   },
   colCheck: {
-    width: 32,
+    width: 36,
+    alignItems: 'center',
   },
   // Set Row
   setRow: {
@@ -1249,7 +1286,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   prevText: {
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textTertiary,
     textAlign: 'center',
   },
@@ -1260,8 +1297,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     backgroundColor: colors.surfaceElevated,
     borderRadius: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 7,
+    paddingHorizontal: 2,
   },
   setInputCompleted: {
     backgroundColor: 'rgba(74, 222, 128, 0.12)',
