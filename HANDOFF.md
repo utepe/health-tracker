@@ -18,7 +18,7 @@ See `PLAN.md` for full architecture details and phased implementation roadmap.
 **Phase 1 (Health Dashboard) — Complete.**
 **Phase 3 (Workout Planner) — ~75% complete.**
 
-The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs are functional. This session added: full Zustand persistence (survives refreshes/crashes), unified workout history (strength + cardio), post-workout template management, editable workout name and notes, short-workout warning modal, and correct cancel-vs-finish separation.
+The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs are functional. Recent sessions added: full Zustand persistence (survives refreshes/crashes), unified workout history (strength + cardio), post-workout template management, editable workout name and notes, short-workout warning modal, correct cancel-vs-finish separation, and responsive scaling for the active workout screen (phone → desktop).
 
 **No Apple Developer Account** — using web preview for UI development. Native iOS build deferred.
 
@@ -55,6 +55,7 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
   - 3-dot menu (exercise level): Add Note, Update Rest Timer, Add Warm-up Set, **Replace Exercise**, Remove Exercise
   - **Replace Exercise flow:** tap → navigates to exercise picker in `mode=replace` (single-tap select, no checkboxes) → swaps exercise in-place, loads new exercise's history, preserves rest time config
   - Notes with pin toggle (pinned = `push-pin` MaterialIcons icon, yellow, persists across sessions; unpinned = session-only)
+  - **Responsive set table:** column widths and font sizes scale with screen width (`scale = screenWidth/390`, clamped 1.0–1.6). SET, KG, REPS, and checkmark columns use `Math.round(baseWidth * scale)`. Previous text base size is 14px. Table header widths match data rows. Works on both iPhone (compact) and web/laptop (expanded)
   - Set table: SET | PREVIOUS | KG | REPS | checkmark
   - Set type picker (popup selector): Working/Warmup/Dropset/Failure with color coding
   - Working set numbering: always sequential (1, 2, 3...) based on working sets only
@@ -63,7 +64,7 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
   - Per-set rest override via `restSeconds` field (null = use exercise default)
   - "Add Set" per exercise, "Add Exercises" button, "Cancel Workout" button
   - **Exercise history carry-over:** pre-seeded for 10 common exercises. First time shows `—`, returning exercise auto-creates same number of sets with weight/reps pre-filled. **Sets correctly restore as checked after app refresh** (initialised from `set.completedAt !== ''`, not hardcoded `false`)
-  - **Rest timer progress bar** (inline): counts DOWN, full controls (−10s, Pause/Resume, Reset, +10s, Skip). Falls back to top banner when completely off-screen
+  - **Rest timer progress bar** (inline): counts DOWN, full controls (−10s, Pause/Resume, Reset, +10s). Skip is on its own centered row below the controls so the countdown stays horizontally centered between symmetric button groups. Falls back to top banner when completely off-screen
   - Web-compatible confirm dialogs (window.confirm on web, Alert on native)
   - **PR detection:** `checkAndMarkPR(setId)` called on every set check-off. Uses Epley 1RM (`weight × (1 + reps/30)`). Trophy icon on PR sets
   - **Short workout modal:** finishing before 5 minutes shows a custom modal (not a system alert) with three buttons: Finish Workout, Cancel Workout, Keep Going. Tapping outside dismisses (Keep Going)
@@ -139,6 +140,9 @@ The app runs on web (`npx expo start --web`) with mock data. All 5 health tabs a
 | Cancelled workouts appeared in history | `handleCancelWorkout` was calling `endSession()` which saves to history; fixed by adding separate `cancelSession()` that clears state without saving |
 | Summary modal required X button to close | Overlay `View` swapped to `Pressable` with `onPress={onClose}`; inner card uses `stopPropagation()` |
 | Workout history exercise count included template exercises | Filtered to only count exercises with `sets.some(s => s.completedAt !== '')` |
+| Set table overflowed off-screen on iPhone | KG/REPS boxes fixed to 64/56px; PREVIOUS uses `flex:1`; `numberOfLines={1}` on prev text |
+| Set table too small on web/laptop after phone fix | Added `scale = screenWidth/390` (clamped 1.0–1.6); column widths and font sizes multiplied by scale; table header uses matching scaled widths |
+| Inline rest timer countdown off-center | Skip button was wider than left-side buttons, pushing countdown left. Moved Skip to its own centered row below; left/right sides now mirror each other symmetrically |
 
 ---
 

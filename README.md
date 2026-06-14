@@ -2,7 +2,7 @@
 
 A personal health tracking mobile app built with React Native/Expo. Merges data from multiple wearables (Garmin Forerunner 255, future Fitbit Air) into a unified dashboard and includes a full-featured strength training workout planner.
 
-**Current status:** Phase 1 (Health Dashboard) complete. Phase 3 (Workout Planner) ~90% complete. Running on web preview — native iOS build deferred pending Apple Developer account.
+**Current status:** Phase 1 (Health Dashboard) complete. Phase 3 (Workout Planner) ~75% complete. Running on web preview — native iOS build deferred pending Apple Developer account.
 
 ---
 
@@ -26,6 +26,7 @@ A personal health tracking mobile app built with React Native/Expo. Merges data 
 - Template CRUD: create/edit with per-exercise target sets, rest time (+/-15s stepper), reorder, delete
 - Template preview modal: overview card with Start / Edit actions
 - **Active workout screen:**
+  - **Responsive set table:** scales column widths and font sizes based on screen width (1× at 390px iPhone, up to 1.6× on laptop). Previous performance text is larger (14px base) for easy reading
   - Strong-style set table: SET | PREVIOUS | KG | REPS | ✓
   - Exercise history carry-over (auto-fills weight/reps from last session; pre-seeded for 10 common exercises)
   - Set type picker (popup): Working / Warmup / Dropset / Failure with color coding
@@ -33,12 +34,13 @@ A personal health tracking mobile app built with React Native/Expo. Merges data 
   - Warmup sets inserted after existing warmups, before first working set
   - Pinned notes (yellow banner, persists across sessions) vs. session-only notes
   - Per-exercise 3-dot menu: Add Note, Update Rest Timer, Add Warm-up Set, **Replace Exercise**, Remove Exercise
-  - **Inline rest timer progress bar** with: -10s, Pause/Resume, Reset, +10s, Skip controls
+  - **Inline rest timer** with centered countdown, symmetric ±10s / Pause / Reset controls, and Skip on its own row below
   - Falls back to top-of-screen banner only when timer is completely off-screen
   - Minimize (chevron-down) to navigate away; session persists in Zustand
   - Resume banner on Workout tab when a session is active
   - Web-compatible confirm dialogs (`window.confirm` on web, `Alert` on native)
-- Workout history screen (shell; data wiring in progress)
+- **Workout history:** unified list of strength sessions and cardio/Garmin workouts, sorted newest first. 3-dot menu per card (rename, save as template, delete). Tap strength card to open full summary modal
+- **Zustand persistence:** all workout state (templates, history, active session, exercise history, rest timer) survives app restarts and crashes via AsyncStorage
 
 ---
 
@@ -186,7 +188,7 @@ eas build --profile development --platform ios
 
 ## Roadmap
 
-### Phase 3 — Workout Planner (in progress, ~90%)
+### Phase 3 — Workout Planner (in progress, ~75%)
 - [x] Exercise picker with search, filter, and muscle group chips
 - [x] Template CRUD with per-exercise rest time config
 - [x] Active workout screen (set logging, rest timer, set types, pinned notes)
@@ -195,13 +197,16 @@ eas build --profile development --platform ios
 - [x] Create custom exercises (name, muscle group, equipment, instructions)
 - [x] Edit custom exercises
 - [x] Search-to-create prompt when no results found
-- [ ] PR detection (compare weight×reps to all-time best, show trophy icon)
-- [ ] Persist completed workouts to `completedWorkouts` in store
-- [ ] Wire workout history screen with date, duration, volume, exercise count
+- [x] PR detection (Epley 1RM vs all-time best, trophy icon on PR sets)
+- [x] Persist completed workouts — Zustand persist middleware (AsyncStorage)
+- [x] Workout history screen (strength + cardio merged, 3-dot menu, summary modal)
+- [x] Post-workout template actions (Update Template / Save as Template)
+- [x] Editable workout name and notes (inline tap or 3-dot menu)
+- [x] Short workout warning modal (<5 min) with Finish / Cancel / Keep Going
+- [x] Responsive set table scaling (phone → laptop)
 - [ ] Pre-populate sets from template target (`max(template.targetSets, historySetCount)`)
 - [ ] Expand exercise library to 200+ exercises
 - [ ] Superset support (shared rest timer between grouped exercises)
-- [ ] Zustand persist middleware (AsyncStorage) for notes, history, templates, custom exercises
 
 ### Phase 2 — Garmin API
 - [ ] Deploy Cloudflare Worker for OAuth 1.0a token exchange
